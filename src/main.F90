@@ -82,7 +82,9 @@ do nstep=0, ntime_step-1
          call QEq(atype, pos, q)
       endif
    endif
+   call hpm_start('timesteps')
    call FORCE(atype, pos, f, q)
+   call hpm_stop('timesteps') 
 
    do i=1, NATOMS
       ity = nint(atype(i))
