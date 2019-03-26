@@ -12,10 +12,9 @@ OBJS := $(SRCS:.F90=.o)
 
 EXE := rxmd
 
-TRACE := /soft/perftools/hpctw/lib/libmpihpm_r.a /bgsys/drivers/ppcfloor/bgpm/lib/libbgpm.a /bgsys/drivers/ppcfloor/spi/lib/libSPI_upci_cnk.a
 
 ../$(EXE): $(OBJS)
-	$(MPIF90) $(MPIF90_FLAGS) -o ../$(EXE) $(OBJS) module.o $(LIBS)  $(TRACE)
+	$(MPIF90) $(MPIF90_FLAGS) -o ../$(EXE) $(OBJS) module.o $(LIBS)
 
 $(OBJS) : base.mod
 
