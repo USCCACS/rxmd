@@ -81,21 +81,21 @@ do i=1, NATOMS
 enddo
 #endif
 
+!--- after the initialization, only the normalized coords are necessary for COPYATOMS()
 
 GEst2=1.d99
-do nstep_qeq=0, nmax-1
-!--- update new charges of buffered atoms.
-  call COPYATOMS(MODE_QCOPY1,QCopyDr, atype, pos, vdummy, fdummy, q)
-  call get_gradient(Gnew)
-!--- get new conjugate direction
-  if (nstep_qeq == 0) then
+nstep_qeq=0
+do 
+   call COPYATOMS(MODE_QCOPY1,QCopyDr, atype, pos, vdummy, fdummy, q)
+   call get_gradient(Gnew)
+   if (nstep_qeq==0) then
       hs(1:NATOMS) = gs(1:NATOMS)
       ht(1:NATOMS) = gt(1:NATOMS)
-  else 
+  end if
+  if  (nstep_qeq > 0) then
       hs(1:NATOMS) = gs(1:NATOMS) + (Gnew(1)/Gold(1))*hs(1:NATOMS)
       ht(1:NATOMS) = gt(1:NATOMS) + (Gnew(2)/Gold(2))*ht(1:NATOMS)
   end if
-!--- update new conjugate direction for buffered atoms.
   call COPYATOMS(MODE_QCOPY2,QCopyDr, atype, pos, vdummy, fdummy, q)
 
 #ifdef QEQDUMP 
@@ -113,6 +113,8 @@ do nstep_qeq=0, nmax-1
 
   if( ( 0.5d0*( abs(GEst2) + abs(GEst1) ) < QEq_tol) ) exit 
   if( abs(GEst2) > 0.d0 .and. (abs(GEst1/GEst2-1.d0) < QEq_tol) ) exit
+  if (nstep_qeq==nmax-1) exit
+
   GEst2 = GEst1
 
 !--- line minimization factor of <s> vector
@@ -152,8 +154,9 @@ do nstep_qeq=0, nmax-1
 
 !--- save old residues.  
   Gold(:) = Gnew(:)
-
+  nstep_qeq = nstep_qeq + 1
 enddo
+
 
 call system_clock(j1,k1)
 it_timer(1)=it_timer(1)+(j1-i1)
@@ -186,8 +189,6 @@ integer :: ti,tj,tk
 
 call system_clock(ti,tk)
 
-
-!!!nbplist(0,:) = 0
 
 !$omp parallel do schedule(runtime), default(shared), &
 !$omp private(i,j,ity,jty,n,m,mn,nn,c1,c2,c3,c4,c5,c6,dr,dr2,drtb,itb,inxn)
@@ -237,6 +238,10 @@ do c3=0, nbcc(3)-1
       enddo
    enddo !   do mn = 1, nbnmesh
 
+   if (nbplist(0,i) > MAXNEIGHBS10) then
+      write(6,*) "ERROR: In qeq.F90 inside qeq_initialize, nbplist greater then MAXNEIGHBS10 on mpirank",myid,"with value",nbplist(0,i)
+      call MPI_FINALIZE(ierr)
+   end if
    i=nbllist(i)
    enddo
 enddo; enddo; enddo
