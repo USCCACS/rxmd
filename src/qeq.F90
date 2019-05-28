@@ -67,7 +67,7 @@ open(91,file="qeqdump"//trim(rankToString(myid))//".txt")
 #endif
 
 !--- copy atomic coords and types from neighbors, used in qeq_initialize()
-call COPYATOMS(MODE_COPY, QCopyDr, atype, pos, vdummy, fdummy, q)
+call COPYATOMS_QEQ(MODE_COPY, QCopyDr, atype, pos, vdummy, fdummy, q)
 call LINKEDLIST(atype, pos, nblcsize, nbheader, nbllist, nbnacell, nbcc, MAXLAYERS_NB)
 
 call qeq_initialize()
@@ -81,16 +81,16 @@ do i=1, NATOMS
 enddo
 #endif
 
-!--- after the initialization, only the normalized coords are necessary for COPYATOMS()
+!--- after the initialization, only the normalized coords are necessary for COPYATOMS_QEQ()
 !--- The atomic coords are converted back to real at the end of this function.
-call COPYATOMS(MODE_QCOPY1,QCopyDr, atype, pos, vdummy, fdummy, q)
+call COPYATOMS_QEQ(MODE_QCOPY1,QCopyDr, atype, pos, vdummy, fdummy, q)
 call get_gradient(Gnew)
 
 !--- Let the initial CG direction be the initial gradient direction
 hs(1:NATOMS) = gs(1:NATOMS)
 ht(1:NATOMS) = gt(1:NATOMS)
 
-call COPYATOMS(MODE_QCOPY2,QCopyDr, atype, pos, vdummy, fdummy, q)
+call COPYATOMS_QEQ(MODE_QCOPY2,QCopyDr, atype, pos, vdummy, fdummy, q)
 
 GEst2=1.d99
 do nstep_qeq=0, nmax-1
@@ -150,7 +150,7 @@ do nstep_qeq=0, nmax-1
   q(1:NATOMS) = qs(1:NATOMS) - mu*qt(1:NATOMS)
 
 !--- update new charges of buffered atoms.
-  call COPYATOMS(MODE_QCOPY1,QCopyDr, atype, pos, vdummy, fdummy, q)
+  call COPYATOMS_QEQ(MODE_QCOPY1,QCopyDr, atype, pos, vdummy, fdummy, q)
 
 !--- save old residues.  
   Gold(:) = Gnew(:)
@@ -161,7 +161,7 @@ do nstep_qeq=0, nmax-1
   ht(1:NATOMS) = gt(1:NATOMS) + (Gnew(2)/Gold(2))*ht(1:NATOMS)
 
 !--- update new conjugate direction for buffered atoms.
-  call COPYATOMS(MODE_QCOPY2,QCopyDr, atype, pos, vdummy, fdummy, q)
+  call COPYATOMS_QEQ(MODE_QCOPY2,QCopyDr, atype, pos, vdummy, fdummy, q)
 
 enddo
 
