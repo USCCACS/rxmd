@@ -87,8 +87,8 @@ enddo
 
 call finalize_qeq(imode)
 
-!write(*,*)  "MPI q_send    stats: ",myid,ns_atoms(1:6)
-!write(*,*)  "MPI q_receive stats: ",myid,nr_atoms(1:6)
+write(*,*)  "MPI q_send    stats: ",myid,ns_atoms(1:6)
+write(*,*)  "MPI q_receive stats: ",myid,nr_atoms(1:6)
 
 !--- for array size stat
 if(mod(nstep,pstep)==0) then
@@ -305,9 +305,6 @@ real(8) :: recv_size
 !--- if myid is the same of target-node ID, don't use MPI call.
 !--- Just copy <sbuffer> to <rbuffer>. Because <send_recv()> will not be used,
 !--- <nr> has to be updated here for <append_atoms()>.
-
-ns = ns_atoms(dflag)*ne
-
 if(myid==tn1) then
    if(ns>0) then
       nr=ns
@@ -327,12 +324,24 @@ if (mypar == 0) then
      ! the number of elements per data packet has to be greater than 1, for example NE_COPY = 10.
      ! if ns == 0, send one double to tell remote rank that there will be no atom data to be sent. 
      if (ns > 0) then
+
+         if (ns .NE. ns_atoms(dflag)*ne) then
+             write(*,*) " MPI call number of atoms send does not match for ",myid,dflag,ns,ns_atoms(dflag)
+             call MPI_FINALIZE(ierr)
+         end if 
+
          call MPI_SEND(sbuffer, ns, MPI_DOUBLE_PRECISION, tn1, 10, MPI_COMM_WORLD, ierr)
      else
          call MPI_SEND(1, 1, MPI_DOUBLE_PRECISION, tn1, 10, MPI_COMM_WORLD, ierr)
      endif
      
-     nr = nr_atoms(dflag)*ne
+     call MPI_Probe(tn2, 11, MPI_COMM_WORLD, recv_stat, ierr)
+     call MPI_Get_count(recv_stat, MPI_DOUBLE_PRECISION, nr, ierr)
+
+     if (nr .NE. nr_atoms(dflag)*ne) then 
+           write(*,*) " MPI call number of atoms received does not match for ",myid,dflag,nr,nr_atoms(dflag)
+           call MPI_FINALIZE(ierr)
+     end if
 
      call CheckSizeThenReallocate_qeq(rbuffer,nr)
 
@@ -343,9 +352,14 @@ if (mypar == 0) then
      if(nr==1) nr=0 
 
 elseif (mypar == 1) then
-     
-     nr = nr_atoms(dflag)*ne
-     
+
+     call MPI_Probe(tn2, 10, MPI_COMM_WORLD, recv_stat, ierr)
+     call MPI_Get_count(recv_stat, MPI_DOUBLE_PRECISION, nr, ierr)
+
+     if (nr .NE. nr_atoms(dflag)*ne) then
+         write(*,*) " MPI call number of atoms received does not match for ",myid,dflag,nr,nr_atoms(dflag)
+         call MPI_FINALIZE(ierr)
+     end if
      call CheckSizeThenReallocate_qeq(rbuffer,nr)
 
      call MPI_RECV(rbuffer, nr, MPI_DOUBLE_PRECISION, tn2, 10, MPI_COMM_WORLD, recv_stat, ierr)
@@ -355,6 +369,12 @@ elseif (mypar == 1) then
      if(nr==1) nr=0 
 
      if (ns > 0) then
+
+          if (ns .NE. ns_atoms(dflag)*ne) then
+               write(*,*) " MPI call number of atoms send does not match for",myid,dflag,ns,ns_atoms(dflag)
+               call MPI_FINALIZE(ierr)
+          end if
+
           call MPI_SEND(sbuffer, ns, MPI_DOUBLE_PRECISION, tn1, 11, MPI_COMM_WORLD, ierr)
      else
           call MPI_SEND(1, 1, MPI_DOUBLE_PRECISION, tn1, 11, MPI_COMM_WORLD, ierr)

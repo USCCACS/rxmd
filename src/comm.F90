@@ -87,6 +87,9 @@ enddo
 
 call finalize(imode)
 
+!write(*,*)  "MPI send stats: ",myid,ns_atoms(1:6)
+!write(*,*)  "MPI receive stats: ",myid,nr_atoms(1:6)
+
 !--- for array size stat
 if(mod(nstep,pstep)==0) then
   ni=nstep/pstep+1
@@ -447,6 +450,9 @@ else
 
 endif
 
+! store the number of atoms being transfered in dflag direction
+ns_atoms(dflag)= ns/ne
+
 call system_clock(tj,tk)
 it_timer(26)=it_timer(26)+(tj-ti)
 
@@ -489,6 +495,9 @@ else
    else
       copyptr(dflag) = copyptr(dflag-1) + nr/ne
    endif
+
+! number of atomd received from the neighbor
+nr_atoms(dflag)= nr/ne
 
 !--- go over the buffered atom
    do i=0, nr/ne-1
