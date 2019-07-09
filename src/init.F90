@@ -1,6 +1,7 @@
 !------------------------------------------------------------------------------------------
 module init
 use fileio
+use ensembles
 !------------------------------------------------------------------------------------------
 contains
 !------------------------------------------------------------------------------------------
@@ -23,6 +24,7 @@ integer(8) :: i8
 real(8) :: rcsize(3), maxrcell
 
 wt0 = MPI_WTIME()
+
 
 !--- for PQEq. cutoff length
 if(isPQEq) then
@@ -227,6 +229,8 @@ maxas(:,:)=0
 call allocatord2d(ipos,1,NBUFFER,1,3)
 ipos(1:NATOMS,1:3)=pos(1:NATOMS,1:3)
 
+!--- Setup ensemble. treq has to be set beforehand.
+call initialize_ensemble()
 
 !--- print out parameters and open data file
 if(myid==0) then

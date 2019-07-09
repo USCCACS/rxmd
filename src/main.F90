@@ -2,6 +2,7 @@
 program rxmd
 use base; use init; use pqeq_vars; use parameters
 use CG; use cmdline_args
+use ensembles
 !------------------------------------------------------------------------------
 implicit none
 integer :: i,ity,it1,it2,irt,provided
@@ -36,9 +37,6 @@ call system_clock(it1,irt)
 
 do nstep=0, ntime_step-1
 
-   if(mod(nstep,pstep)==0) then
-       call PRINTE(atype, v, q)
-   endif
    if(mod(nstep,fstep)==0) &
         call OUTPUT(atype, pos, v, q, GetFileNameBase(DataDir,current_step+nstep))
 
@@ -60,19 +58,28 @@ do nstep=0, ntime_step-1
    if(mod(nstep,sstep)==0.and.mdmode==8) &
       call AdjustTemperature(atype, v)
 
+!--- Nose-Hoover thermostat
+   call update_thermostats()
+
 !--- update velocity
-   call vkick(1.d0, atype, v, f) 
-
-!--- update coordinates
-   qsfv(1:NATOMS)=qsfv(1:NATOMS)+0.5d0*dt*Lex_w2*(q(1:NATOMS)-qsfp(1:NATOMS))
-   qsfp(1:NATOMS)=qsfp(1:NATOMS)+dt*qsfv(1:NATOMS)
-
+   if(is_npt) then
+      call nhcp_L_g2(dt*0.5d0)
+      if(myid==0) print*,'nhcp_L_g2(dt*0.5d0) done ' 
+      call nhcp_L_2(dt*0.5d0)
+      if(myid==0) print*,'nhcp_L_2(dt*0.5d0) done ' 
+      call nhcp_L_1(dt)
+      if(myid==0) print*,'nhcp_L_1(dt) done ' 
+   else
+      call vkick(1.d0, atype, v, f) 
 !--- always correct the linear momentum when electric field is applied. 
-   if(isEfield) call LinearMomentum(atype, v)
-   pos(1:NATOMS,1:3)=pos(1:NATOMS,1:3)+dt*v(1:NATOMS,1:3)
+      if(isEfield) call LinearMomentum(atype, v)
+      pos(1:NATOMS,1:3)=pos(1:NATOMS,1:3)+dt*v(1:NATOMS,1:3)
+   endif
 
 !--- migrate atoms after positions are updated
    call COPYATOMS(MODE_MOVE,[0.d0, 0.d0, 0.d0],atype, pos, v, f, q)
+
+   if(is_npt) call nhcp_L_g1(dt)
    
    if(mod(nstep,qstep)==0) then
       if(isPQEq) then
@@ -83,19 +90,22 @@ do nstep=0, ntime_step-1
    endif
    call FORCE(atype, pos, f, q)
 
-   do i=1, NATOMS
-      ity = nint(atype(i))
-      astr(1)=astr(1)+v(i,1)*v(i,1)*mass(ity)
-      astr(2)=astr(2)+v(i,2)*v(i,2)*mass(ity)
-      astr(3)=astr(3)+v(i,3)*v(i,3)*mass(ity)
-      astr(4)=astr(4)+v(i,2)*v(i,3)*mass(ity)
-      astr(5)=astr(5)+v(i,3)*v(i,1)*mass(ity)
-      astr(6)=astr(6)+v(i,1)*v(i,2)*mass(ity)
-   end do
-
+   if(is_npt) then
+      call nhcp_L_2(dt*0.5d0)
+      call nhcp_L_g2(dt*0.5d0)
+   else
 !--- update velocity
-   call vkick(1.d0, atype, v, f) 
-   qsfv(1:NATOMS)=qsfv(1:NATOMS)+0.5d0*dt*Lex_w2*(q(1:NATOMS)-qsfp(1:NATOMS))
+     call vkick(1.d0, atype, v, f) 
+   endif
+
+!--- Nose-Hoover thermostat
+   call update_thermostats()
+
+   if(mod(nstep,pstep)==0) call PRINTE(atype, v, q)
+   if(mod(nstep,pstep)==0) then
+      call npt_test()
+      call print_nhc_chains(nhc_particle)
+   endif
 
 enddo
 
