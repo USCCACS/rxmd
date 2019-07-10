@@ -7,10 +7,10 @@ use parameters, only : mass
 implicit none
 
 integer,parameter :: num_chain_particle = 8 
-integer,parameter :: num_chain_barostat = 4 
+integer,parameter :: num_chain_barostat = 8 
 real(8),parameter :: chain_mass_particle = 1.d0
 real(8),parameter :: chain_mass_barostat = 5.d0
-real(8),parameter :: barostat_mass = 0.1d0
+real(8),parameter :: barostat_mass = 10d0
 
 !--- external pressure
 real(8) :: Pext = 0d0
@@ -55,21 +55,19 @@ subroutine nhcp_L_g2(deltaT)
       barostat%pos(ia,ib)=HH(ia,ib,0)
    enddo; enddo
 
-   if(myid==0) then
-      print'(a,3f8.3)','barostat%pos(:,1)',barostat%pos(:,1)
-      print'(a,3f8.3)','barostat%pos(:,2)',barostat%pos(:,2)
-      print'(a,3f8.3)','barostat%pos(:,3)',barostat%pos(:,3)
-   endif
+   !if(myid==0) then
+   !   print'(a,3f8.3)','barostat%pos(:,1)',barostat%pos(:,1)
+   !   print'(a,3f8.3)','barostat%pos(:,2)',barostat%pos(:,2)
+   !   print'(a,3f8.3)','barostat%pos(:,3)',barostat%pos(:,3)
+   !endif
 
    volume = get_determinant(barostat%pos)
    kene = get_kinetic_energy()*2.d0
-   if(myid==0) print'(a,3es15.5)','volume,kene: ', volume, kene
-
+   !if(myid==0) print'(a,3es15.5)','volume,kene: ', volume, kene
   
    barostat%force = (get_pint() - Pext*identity_matrix)/volume + &
        (kene/(3*GNATOMS)) *identity_matrix
 
-   barostat%force=0.d0 ! for debugging! 
    if(myid==0) then
       print'(a,3es15.5)','barostat%force(:,1)',barostat%force(:,1)
       print'(a,3es15.5)','barostat%force(:,2)',barostat%force(:,2)
@@ -113,13 +111,31 @@ subroutine nhcp_L_2(deltaT)
       dmat1(ia,ia) = exp(deltaT*arg)
       dmat2(ia,ia) = exp(deltaTh*arg)*get_sinhx(deltaTh*arg)
    enddo
+!   if(myid==0) then
+!     print'(a)','nhcp_L_2'//repeat('-',50)
+!     do ia=1,3
+!        print'(a,i3,3f8.3)','dmat1(1:3,ia): ', ia,dmat1(1:3,ia)
+!     enddo
+!     do ia=1,3
+!        print'(a,i3,3f8.3)','dmat2(1:3,ia): ', ia,dmat2(1:3,ia)
+!     enddo
+!   endif
 
    odo1 = matmul(transpose(barostat%eigv),matmul(dmat1,barostat%eigv))
    odo2 = matmul(transpose(barostat%eigv),matmul(dmat2,barostat%eigv))
+!   if(myid==0) then
+!     print'(a)','nhcp_L_2'//repeat('-',50)
+!     do ia=1,3
+!        print'(a,i3,3f8.3)','odo1(1:3,ia): ', ia,odo1(1:3,ia)
+!     enddo
+!     do ia=1,3
+!        print'(a,i3,3f8.3)','odo2(1:3,ia): ', ia,odo2(1:3,ia)
+!     enddo
+!   endif
    do i = 1, NATOMS
       ity = nint(atype(i))
       do ia = 1,3 
-         v(i,ia) = sum(odo1(ia,1:3)*v(i,1:3)) + deltaT*mass(ity)*sum(odo2(ia,1:3)*f(i,1:3))
+         v(i,ia) = sum(odo1(ia,1:3)*v(i,1:3)) + deltaTh*sum(odo2(ia,1:3)*f(i,1:3))/mass(ity)
       enddo
    enddo
 
@@ -147,7 +163,7 @@ subroutine nhcp_L_1(deltaT)
    do i = 1, NATOMS
       ity = nint(atype(i))
       do ia = 1,3 
-         pos(i,ia) = sum(odo1(ia,1:3)*pos(i,1:3)) + dt*sum(odo2(ia,1:3)*v(i,1:3))
+         pos(i,ia) = sum(odo1(ia,1:3)*pos(i,1:3)) + deltaT*sum(odo2(ia,1:3)*v(i,1:3))
       enddo
    enddo
 
@@ -172,9 +188,21 @@ subroutine nhcp_L_g1(deltaT)
 
    barostat%pos = matmul(odo1, barostat%pos)
 
+   if(myid==0) then
+     print'(a)','before: '//repeat('-',50)
+     do ia=1,3
+        print'(a,i3,3f8.3)','HH(1:3,ia,0): ', ia,HH(1:3,ia,0)
+     enddo
+   endif
    do ia=1,3; do ib=1,3
       HH(ia,ib,0) = barostat%pos(ia,ib)
    enddo; enddo
+   if(myid==0) then
+     print'(a)','after: '//repeat('-',50)
+     do ia=1,3
+        print'(a,i3,3f8.3)','HH(1:3,ia,0): ', ia,HH(1:3,ia,0)
+     enddo
+   endif
 
    call xu2xs_inplace(NATOMS, pos)
    call UpdateBoxParams()
@@ -210,7 +238,7 @@ if(is_npt) then
    call nhc_update_chains(nhc_particle)
    call nhc_update_chains(nhc_barostat, barostat)
 
-   call print_nhc_chains(nhc_barostat) 
+   !call print_nhc_chains(nhc_barostat) 
 
 else if(is_nvt) then
 
@@ -280,12 +308,12 @@ subroutine nhc_update_chains(nhc, barostat)
       mm = matmul(transpose(barostat%momentum),barostat%momentum)
       kene = get_trace(mm)/barostat%mass
       NKbT = 6d0*KbT !see the paragraph below Eq 46 in 2010, Chemi Phys 307, 294-305, (2010)
-      if(myid==0) then
-        print'(a,l,3es15.5)','momentum(:,1): ',present(barostat),barostat%momentum(:,1)
-        print'(a,l,3es15.5)','momentum(:,2): ',present(barostat),barostat%momentum(:,2)
-        print'(a,l,3es15.5)','momentum(:,3): ',present(barostat),barostat%momentum(:,3)
-        print'(a,l,2es15.5)','kene,NKbT: ', present(barostat),kene, NKbT
-      endif
+      !if(myid==0) then
+      !  print'(a,l,3es15.5)','momentum(:,1): ',present(barostat),barostat%momentum(:,1)
+      !  print'(a,l,3es15.5)','momentum(:,2): ',present(barostat),barostat%momentum(:,2)
+      !  print'(a,l,3es15.5)','momentum(:,3): ',present(barostat),barostat%momentum(:,3)
+      !  print'(a,l,2es15.5)','kene,NKbT: ', present(barostat),kene, NKbT
+      !endif
    else
       kene = get_kinetic_energy()*2d0
       NKbT = 3d0*GNATOMS*KbT
@@ -354,10 +382,7 @@ do i=1, NATOMS
    enddo; enddo
 enddo
 
-pint(1,2)=0.5d0*(pint0(1,2)+pint0(2,1))
-pint(1,3)=0.5d0*(pint0(1,3)+pint0(3,1))
-
-!--- symmetrize pint
+!--- symmetrize internal pressure
 do ia=1,3
 do ib=1,3
    pint(ia,ib) = 0.5d0*(pint0(ia,ib) + pint0(ib,ia))

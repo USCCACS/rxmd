@@ -64,11 +64,8 @@ do nstep=0, ntime_step-1
 !--- update velocity
    if(is_npt) then
       call nhcp_L_g2(dt*0.5d0)
-      if(myid==0) print*,'nhcp_L_g2(dt*0.5d0) done ' 
       call nhcp_L_2(dt*0.5d0)
-      if(myid==0) print*,'nhcp_L_2(dt*0.5d0) done ' 
       call nhcp_L_1(dt)
-      if(myid==0) print*,'nhcp_L_1(dt) done ' 
    else
       call vkick(1.d0, atype, v, f) 
 !--- always correct the linear momentum when electric field is applied. 
@@ -102,10 +99,10 @@ do nstep=0, ntime_step-1
    call update_thermostats()
 
    if(mod(nstep,pstep)==0) call PRINTE(atype, v, q)
-   if(mod(nstep,pstep)==0) then
-      call npt_test()
-      call print_nhc_chains(nhc_particle)
-   endif
+   !if(mod(nstep,pstep)==0) then
+   !   call npt_test()
+   !   call print_nhc_chains(nhc_particle)
+   !endif
 
 enddo
 
