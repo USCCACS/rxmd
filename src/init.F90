@@ -123,7 +123,11 @@ endif
 
 call allocatord1d(deltalp,1,NBUFFER)
 
-call ReadBIN(atype, pos, v, q, f, trim(DataDir)//"/rxff.bin")
+if(isRunFromXYZ) then
+  call ReadXYZ(atype, pos, v, q, f, RunFromXYZPath)
+else
+  call ReadBIN(atype, pos, v, q, f, trim(DataDir)//"/rxff.bin")
+endif
 
 !--- Varaiable for extended Lagrangian method
 call allocatord1d(qtfp,1,NBUFFER)

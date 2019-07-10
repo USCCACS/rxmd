@@ -8,3 +8,7 @@ processors   1 1 1                  <vprocs>
  
 # ReaxFF params
 QEq          1  500  1.d-7  1       <isQEq> <NMAXQEq> <QEq_tol> <qstep> 
+
+# PQEq parm path and electric field
+PQEqParm     ./pqeq1.par            <PQEqParmPath>
+efield       1  0.01                <eFieldDir> <eFieldStrength> 

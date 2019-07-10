@@ -1,9 +1,10 @@
-1                    <mdmod>
-0.25    100         <dt> <ntime_step> 
-300  1.0   100       <treq> <vsfact> <sstep>
-10   10           <fstep>  <pstep>
-2 1 1                <vprocs>
-1  500  1.d-7  1      <isQEq> <NMAXQEq> <QEq_tol> <qstep> 
-1.0  2.0              <Lex_fqs> <Lex_k>
-.false. .false. .false. .true. <isBinary> <isBondFile> <isPDB> <isXYZ>
-1.d-6                <ftol> 
+# RXMD params 
+mdmode       1                      <mdmode>
+time         0.25    100            <dt> <ntime_step> 
+temperature  300  1.0   100         <treq> <vsfact> <sstep>
+io_step      100   10               <fstep>  <pstep>
+io_type      .false. .false. .false. .true. <isBinary> <isBondFile> <isPDB> <isXYZ>
+processors   2 1 1                  <vprocs>
+ 
+# ReaxFF params
+QEq          1  500  1.d-7  1       <isQEq> <NMAXQEq> <QEq_tol> <qstep> 

@@ -357,7 +357,7 @@ end subroutine
 end subroutine OUTPUT
 
 !--------------------------------------------------------------------------
-subroutine ReadMoS2(atype, rreal, v, q, f, fileName)
+subroutine ReadXYZ(atype, rreal, v, q, f, fileName)
 use atoms; use MemoryAllocator
 !--------------------------------------------------------------------------
 implicit none
@@ -366,33 +366,41 @@ character(*),intent(in) :: fileName
 real(8),allocatable,dimension(:),intent(inout) :: atype,q
 real(8),allocatable,dimension(:,:),intent(inout) :: rreal,v,f
 
-integer :: i,i1
-
-integer (kind=MPI_OFFSET_KIND) :: offset, offsettmp
-integer (kind=MPI_OFFSET_KIND) :: fileSize
-integer :: localDataSize, metaDataSize, scanbuf
-integer :: fh ! file handler
-
-integer :: nmeta
-integer,allocatable :: idata(:)
-real(8),allocatable :: dbuf(:)
-real(8) :: ddata(6), d10(10)
-
-real(8) :: rnorm(NBUFFER,3), mat(3,3)
-integer :: j
-
-!=== # of unit cells ===
-integer :: mx=4,my=4,mz=4
-
-integer :: ix,iy,iz,ntot, imos2, iigd
+real(8) :: dbuf6(6), mat(3,3)
 
 integer :: ti,tj,tk
 
-integer,parameter :: nMoS2=24
-real(8) :: pos0(nMoS2*3)
-integer :: atype0(nMoS2)
+integer :: i,j,i1, ntot, iigd, num_unit, funit
+real(8),allocatable :: pos0(:)
+integer,allocatable :: atype0(:)
 
 call system_clock(ti,tk)
+
+if(myid==0) then
+  open(newunit=funit, file=trim(filename), status='old', form='formatted')
+
+  read(funit,fmt=*) num_unit
+  allocate(pos0(3*num_unit), atype0(num_unit))
+
+  read(funit,fmt=*) dbuf6(1:6)
+
+  do i = 1, num_unit
+!FIXME: here, user needs to convert element name to cooresponding integer beforehand. a better way to handle this? 
+     read(funit,fmt=*) atype0(i),pos0(i*3-2:i*3) 
+  enddo
+
+  close(funit)
+endif
+
+call MPI_Bcast(num_unit,1,MPI_INTEGER,0,MPI_COMM_WORLD,ierr)
+if(myid>0) allocate(pos0(3*num_unit), atype0(num_unit))
+
+call MPI_Bcast(dbuf6,size(dbuf6),MPI_DOUBLE_PRECISION,0,MPI_COMM_WORLD,ierr)
+lata=dbuf6(1); latb=dbuf6(2); latc=dbuf6(3)
+lalpha=dbuf6(4); lbeta=dbuf6(5); lgamma=dbuf6(6)
+
+call MPI_Bcast(atype0,num_unit,MPI_INTEGER,0,MPI_COMM_WORLD,ierr)
+call MPI_Bcast(pos0,3*num_unit,MPI_DOUBLE_PRECISION,0,MPI_COMM_WORLD,ierr)
 
 !--- allocate arrays
 if(.not.allocated(atype)) call allocatord1d(atype,1,NBUFFER)
@@ -404,51 +412,20 @@ if(.not.allocated(qsfp)) call allocatord1d(qsfp,1,NBUFFER)
 if(.not.allocated(qsfv)) call allocatord1d(qsfv,1,NBUFFER)
 f(:,:)=0.0
 
-pos0=(/ &
-0.499975,0.333350,0.250000,0.749975,0.833350,0.250000,&
-0.250025,0.166650,0.750000,0.000025,0.666650,0.750000,&
-0.750025,0.166650,0.750000,0.500025,0.666650,0.750000,&
-0.249975,0.833350,0.250000,0.999975,0.333350,0.250000,&
-0.500025,0.666650,0.121000,0.250025,0.166650,0.379000,&
-0.000025,0.666650,0.379000,0.750025,0.166650,0.379000,&
-0.500025,0.666650,0.379000,0.499975,0.333350,0.879000,&
-0.249975,0.833350,0.879000,0.999975,0.333350,0.879000,&
-0.749975,0.833350,0.879000,0.499975,0.333350,0.621000,&
-0.249975,0.833350,0.621000,0.999975,0.333350,0.621000,&
-0.749975,0.833350,0.621000,0.250025,0.166650,0.121000,&
-0.000025,0.666650,0.121000,0.750025,0.166650,0.121000/)
-
-atype0=(/ &
-3,3,3,3, 3,3,3,3, &
-2,2,2,2, 2,2,2,2, 2,2,2,2, 2,2,2,2 /)
-
-!--- local unit cell parameters
-lata=6.30000d0
-latb=5.45596d0
-latc=12.3000d0
-lalpha=90.0000d0
-lbeta=90.0000d0
-lgamma=90.0000d0
-
-iigd = mx*my*mz*nMoS2*myid ! for global ID
+iigd = num_unit*myid ! for global ID
 ntot=0
-do ix=0,mx-1
-do iy=0,my-1
-do iz=0,mz-1
-   do imos2=1,nMoS2
-      ntot=ntot+1
-      rreal(ntot,1:3) = pos0(3*imos2-2:3*imos2)+(/ix,iy,iz/)  ! repeat unit cell
-      rreal(ntot,1:3) = rreal(ntot,1:3)+vID(1:3)*(/mx,my,mz/) ! adding the box origin
-      rreal(ntot,1:3) = rreal(ntot,1:3)*(/lata,latb,latc/) ! real coords
-      atype(ntot) = dble(atype0(imos2)) + (iigd+ntot)*1d-13
-   enddo 
-enddo; enddo; enddo
+do i=1,num_unit
+   ntot=ntot+1
+   rreal(ntot,1:3) = pos0(3*i-2:3*i) + vID(1:3) ! adding the box origin
+   rreal(ntot,1:3) = rreal(ntot,1:3)*(/lata,latb,latc/) ! real coords
+   atype(ntot) = dble(atype0(i)) + (iigd+ntot)*1d-13
+enddo 
 NATOMS=ntot
 
 !--- update to glocal cell parameters
-lata=lata*mx*vprocs(1)
-latb=latb*my*vprocs(2)
-latc=latc*mz*vprocs(3)
+lata=lata*vprocs(1)
+latb=latb*vprocs(2)
+latc=latc*vprocs(3)
 
 call GetBoxParams(mat,lata,latb,latc,lalpha,lbeta,lgamma)
 do i=1, 3

@@ -265,8 +265,8 @@ real(8) :: springConst=0.d0
 logical :: hasSpringForce(16)
 real(8),allocatable :: ipos(:,:)
 
-logical :: isFF=.false., isData=.false., isMDparm=.false.
-character(MAXSTRLENGTH) :: FFPath="ffield", DataDir="DAT", ParmPath="rxmd.in"
+logical :: isFF=.false., isData=.false., isMDparm=.false., isRunFromXYZ=.false.
+character(MAXSTRLENGTH) :: FFPath="ffield", DataDir="DAT", ParmPath="rxmd.in", RunFromXYZPath=""
 
 logical :: saveRunProfile=.false.
 character(MAXSTRLENGTH) :: RunProfilePath="profile.dat"
