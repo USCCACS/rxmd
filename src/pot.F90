@@ -62,7 +62,7 @@ if(isEfield) call EEfield(PE(13),NATOMS,pos,q,f,atype,Eev_kcal)
 
 CALL ForceBondedTerms(NMINCELL)
 
-do i=1, NBUFFER
+do i=1, NATOMS
    astr(1)=astr(1)+pos(i,1)*f(i,1)
    astr(2)=astr(2)+pos(i,2)*f(i,2)
    astr(3)=astr(3)+pos(i,3)*f(i,3)

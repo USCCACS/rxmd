@@ -410,7 +410,8 @@ open(30,file=trim(adjustl(outputDirName))//"/rxff.bin",form="unformatted",access
 write(30) nprocs, vprocs(1:3)
 write(30) lnatoms(0:nprocs-1)
 write(30) 0
-write(30) L1, L2, L3, Lalpha, Lbeta, Lgamma
+!write(30) L1, L2, L3, Lalpha, Lbeta, Lgamma
+write(30) H(1,1:3),H(2,1:3),H(3,1:3)
 
 write(20,'(i12)') sum(lnatoms(:))
 write(20,'(6f12.3,3x,a)') L1, L2, L3, Lalpha, Lbeta, Lgamma, trim(inputFileName)

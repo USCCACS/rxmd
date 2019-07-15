@@ -225,6 +225,17 @@ real(8),intent(in) :: v(NBUFFER,3)
 
 integer :: i,ity,cstep
 real(8) :: qq=0.d0,tt=0.d0,ss=0.d0,buf(0:23)
+real(8) :: volume, gmass, density
+
+volume = &
+HH(1,1,0)*(HH(2,2,0)*HH(3,3,0) - HH(3,2,0)*HH(2,3,0)) + &
+HH(2,1,0)*(HH(3,2,0)*HH(1,3,0) - HH(1,2,0)*HH(3,3,0)) + &
+HH(3,1,0)*(HH(1,2,0)*HH(2,3,0) - HH(2,2,0)*HH(1,3,0))
+gmass = 0.d0
+do ity = 1, size(natoms_per_type)
+   gmass = gmass + mass(ity)*natoms_per_type(ity)
+enddo
+density = gmass/volume*UDENS
 
 i=nstep/pstep+1
 maxas(i,1)=NATOMS
@@ -265,9 +276,9 @@ if(myid==0) then
    
    cstep = nstep + current_step 
 
-   write(6,'(a,i9,3es13.5,6es11.3,1x,3f8.2,i4,f8.2,f8.2)') 'MDstep: ',cstep,GTE,GPE(0),GKE, &
+   write(6,'(a,i9,3es13.5,6es11.3,1x,3f8.2,i4,es15.5,f8.2,f8.2,f8.2)') 'MDstep: ',cstep,GTE,GPE(0),GKE, &
    GPE(1),sum(GPE(2:4)),sum(GPE(5:7)),sum(GPE(8:9)),GPE(10),sum(GPE(11:13)), &
-   tt, ss, qq, nstep_qeq, GetTotalMemory()*1e-9, MPI_WTIME()-wt0
+   tt, ss, qq, nstep_qeq, volume, density, GetTotalMemory()*1e-9, MPI_WTIME()-wt0
 
    !write(6,'(a,i9,6f12.6)') 'stress : ',cstep,astr(1:6)
 

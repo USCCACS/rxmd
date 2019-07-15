@@ -10,10 +10,10 @@ integer,parameter :: num_chain_particle = 8
 integer,parameter :: num_chain_barostat = 8 
 real(8),parameter :: chain_mass_particle = 1.d0
 real(8),parameter :: chain_mass_barostat = 5.d0
-real(8),parameter :: barostat_mass = 10d0
+real(8),parameter :: barostat_mass = 200d0
 
 !--- external pressure
-real(8) :: Pext = 0d0
+real(8),parameter :: Pext = 1d0/3.7255d0 ! 1unit = 3.7255 [TPa]
 real(8) :: dt2, dt4, dt8
 
 logical :: is_nvt=.false., is_npt=.false.
@@ -27,7 +27,7 @@ type nhc_type
 end type
 
 type barostat_type
-   real(8) :: force(3,3), momentum(3,3), pos(3,3), mass
+   real(8) :: force(3,3), momentum(3,3), pos(3,3), velocity(3,3), mass
    real(8) :: eigv(3,3), eige(3)
 end type
 
@@ -65,29 +65,31 @@ subroutine nhcp_L_g2(deltaT)
    kene = get_kinetic_energy()*2.d0
    !if(myid==0) print'(a,3es15.5)','volume,kene: ', volume, kene
   
-   barostat%force = (get_pint() - Pext*identity_matrix)/volume + &
-       (kene/(3*GNATOMS)) *identity_matrix
+   barostat%force = volume*(get_pint() - Pext*identity_matrix) + kene/(3*GNATOMS)*identity_matrix
 
-   if(myid==0) then
-      print'(a,3es15.5)','barostat%force(:,1)',barostat%force(:,1)
-      print'(a,3es15.5)','barostat%force(:,2)',barostat%force(:,2)
-      print'(a,3es15.5)','barostat%force(:,3)',barostat%force(:,3)
-   endif
+   !if(myid==0) then
+   !   print'(a)',repeat('-',60)
+   !   print'(a,3f15.5)','barostat%force(:,1)',barostat%force(:,1)
+   !   print'(a,3f15.5)','barostat%force(:,2)',barostat%force(:,2)
+   !   print'(a,3f15.5)','barostat%force(:,3)',barostat%force(:,3)
+   !endif
 
-   barostat%momentum = barostat%momentum + deltaT*barostat%force 
-   if(myid==0) then
-      print'(a,3es15.5)','barostat%momentum(:,1)',barostat%momentum(:,1)
-      print'(a,3es15.5)','barostat%momentum(:,2)',barostat%momentum(:,2)
-      print'(a,3es15.5)','barostat%momentum(:,3)',barostat%momentum(:,3)
-   endif
+   barostat%momentum = barostat%momentum + deltaT*barostat%force
+   !if(myid==0) then
+   !   print'(a)',repeat('-',60)
+   !   print'(a,3f15.5)','barostat%momentum(:,1)',barostat%momentum(:,1)
+   !   print'(a,3f15.5)','barostat%momentum(:,2)',barostat%momentum(:,2)
+   !   print'(a,3f15.5)','barostat%momentum(:,3)',barostat%momentum(:,3)
+   !endif
 
-   call jacobi(barostat%momentum,3,3,barostat%eige,barostat%eigv,num_rotation)
-   if(myid==0) then
-      print'(a,3es15.5)','barostat%eigv(:,1)',barostat%eigv(:,1)
-      print'(a,3es15.5)','barostat%eigv(:,2)',barostat%eigv(:,2)
-      print'(a,3es15.5)','barostat%eigv(:,3)',barostat%eigv(:,3)
-      print'(a,3es15.5)','barostat%eige(1:3)',barostat%eige(:)
-   endif
+   barostat%velocity = barostat%momentum / barostat%mass
+   call jacobi(barostat%velocity,3,3,barostat%eige,barostat%eigv,num_rotation)
+   !if(myid==0) then
+   !   print'(a,i6,3f10.5)','num_rotation,barostat%eige(1:3)',num_rotation,barostat%eige(:)
+   !   print'(a,3es15.5)','barostat%eigv(:,1)',barostat%eigv(:,1)
+   !   print'(a,3es15.5)','barostat%eigv(:,2)',barostat%eigv(:,2)
+   !   print'(a,3es15.5)','barostat%eigv(:,3)',barostat%eigv(:,3)
+   !endif
 
 end subroutine
 
@@ -103,7 +105,7 @@ subroutine nhcp_L_2(deltaT)
 
    deltaTh = 0.5d0*deltaT
 
-   vg_trace = get_trace(barostat%momentum)
+   vg_trace = get_trace(barostat%momentum)/barostat%mass
 
    dmat1=0.d0; dmat2=0.d0
    do ia=1,3
@@ -111,27 +113,10 @@ subroutine nhcp_L_2(deltaT)
       dmat1(ia,ia) = exp(deltaT*arg)
       dmat2(ia,ia) = exp(deltaTh*arg)*get_sinhx(deltaTh*arg)
    enddo
-!   if(myid==0) then
-!     print'(a)','nhcp_L_2'//repeat('-',50)
-!     do ia=1,3
-!        print'(a,i3,3f8.3)','dmat1(1:3,ia): ', ia,dmat1(1:3,ia)
-!     enddo
-!     do ia=1,3
-!        print'(a,i3,3f8.3)','dmat2(1:3,ia): ', ia,dmat2(1:3,ia)
-!     enddo
-!   endif
 
-   odo1 = matmul(transpose(barostat%eigv),matmul(dmat1,barostat%eigv))
-   odo2 = matmul(transpose(barostat%eigv),matmul(dmat2,barostat%eigv))
-!   if(myid==0) then
-!     print'(a)','nhcp_L_2'//repeat('-',50)
-!     do ia=1,3
-!        print'(a,i3,3f8.3)','odo1(1:3,ia): ', ia,odo1(1:3,ia)
-!     enddo
-!     do ia=1,3
-!        print'(a,i3,3f8.3)','odo2(1:3,ia): ', ia,odo2(1:3,ia)
-!     enddo
-!   endif
+   odo1 = matmul(barostat%eigv,matmul(dmat1,transpose(barostat%eigv)))
+   odo2 = matmul(barostat%eigv,matmul(dmat2,transpose(barostat%eigv)))
+
    do i = 1, NATOMS
       ity = nint(atype(i))
       do ia = 1,3 
@@ -158,10 +143,9 @@ subroutine nhcp_L_1(deltaT)
       dmat2(ia,ia) = exp(deltaTh*barostat%eige(ia))*get_sinhx(deltaTh*barostat%eige(ia))
    enddo
 
-   odo1 = matmul(transpose(barostat%eigv),matmul(dmat1,barostat%eigv))
-   odo2 = matmul(transpose(barostat%eigv),matmul(dmat2,barostat%eigv))
+   odo1 = matmul(barostat%eigv,matmul(dmat1,transpose(barostat%eigv)))
+   odo2 = matmul(barostat%eigv,matmul(dmat2,transpose(barostat%eigv)))
    do i = 1, NATOMS
-      ity = nint(atype(i))
       do ia = 1,3 
          pos(i,ia) = sum(odo1(ia,1:3)*pos(i,1:3)) + deltaT*sum(odo2(ia,1:3)*v(i,1:3))
       enddo
@@ -176,33 +160,30 @@ subroutine nhcp_L_g1(deltaT)
    real(8),intent(in) :: deltaT
    integer :: i,ity,ia,ib
    real(8) :: deltaTh, dmat1(3,3), odo1(3,3)
+   integer :: ic
+   real(8) :: odo2(3,3), vec(3)
 
    deltaTh = 0.5d0*deltaT
 
-   dmat1=0.d0
-   do ia=1,3
-      dmat1(ia,ia) = exp(deltaT*barostat%eige(ia))
-   enddo
+   !dmat1=0.d0
+   !do ia=1,3
+   !   dmat1(ia,ia) = exp(deltaT*barostat%eige(ia))
+   !enddo
+   !odo1 = matmul(barostat%eigv,matmul(dmat1,transpose(barostat%eigv)))
+   !barostat%pos = matmul(transpose(odo1), barostat%pos)
 
-   odo1 = matmul(transpose(barostat%eigv),matmul(dmat1,barostat%eigv))
+   barostat%pos = barostat%pos + deltaT*barostat%velocity
 
-   barostat%pos = matmul(odo1, barostat%pos)
+   !if(myid==0) then
+   !   print'(a)',repeat('-',60)
+   !   print'(a,3(3f15.5,1x))','barostat%pos(:,1),v,f: ',barostat%pos(:,1), barostat%velocity(:,1), barostat%force(:,1)
+   !   print'(a,3(3f15.5,1x))','barostat%pos(:,2),v,f: ',barostat%pos(:,2), barostat%velocity(:,2), barostat%force(:,2)
+   !   print'(a,3(3f15.5,1x))','barostat%pos(:,3),v,f: ',barostat%pos(:,3), barostat%velocity(:,3), barostat%force(:,3)
+   !endif
 
-   if(myid==0) then
-     print'(a)','before: '//repeat('-',50)
-     do ia=1,3
-        print'(a,i3,3f8.3)','HH(1:3,ia,0): ', ia,HH(1:3,ia,0)
-     enddo
-   endif
    do ia=1,3; do ib=1,3
       HH(ia,ib,0) = barostat%pos(ia,ib)
    enddo; enddo
-   if(myid==0) then
-     print'(a)','after: '//repeat('-',50)
-     do ia=1,3
-        print'(a,i3,3f8.3)','HH(1:3,ia,0): ', ia,HH(1:3,ia,0)
-     enddo
-   endif
 
    call xu2xs_inplace(NATOMS, pos)
    call UpdateBoxParams()
@@ -212,10 +193,10 @@ end subroutine
 
 
 !-----------------------------------------------------------------------
-function nhc_ctor(num,mass) result(c)
+function nhc_ctor(num,ctime) result(c)
 !-----------------------------------------------------------------------
    integer,intent(in) :: num
-   real(8),intent(in) :: mass
+   real(8),intent(in) :: ctime ! characteristic time
    type(nhc_type) :: c
 
    c%num_chains = num
@@ -224,7 +205,7 @@ function nhc_ctor(num,mass) result(c)
 
    c%pos=0.d0; c%momentum=0.d0; c%force=0.d0
 
-   c%mass=mass
+   c%mass=KbT*ctime**2
 
    return
 end function
@@ -251,26 +232,35 @@ end subroutine
 !-----------------------------------------------------------------------
 subroutine initialize_ensemble() 
 !-----------------------------------------------------------------------
+integer :: ia,ib
 
 !is_nvt=.true.
 is_npt=.true.
 
+KbT = treq
+if(is_nvt .or. is_npt) then
+   if(myid==0) print'(a,2l,f8.3)','is_nvt,is_npt,KbT: ',is_nvt,is_npt,KbT
+endif
+
 !--- Nose-Hoover chain
 if(is_npt) then
 
-   nhc_particle = nhc_ctor(num=num_chain_particle, mass=chain_mass_particle)
-   nhc_barostat = nhc_ctor(num=num_chain_barostat, mass=chain_mass_barostat)
+   nhc_particle = nhc_ctor(num=num_chain_particle, ctime=100d0*dt)
+   nhc_barostat = nhc_ctor(num=num_chain_barostat, ctime=100d0*dt)
 
-   barostat%force=0d0;  barostat%momentum=0d0; barostat%pos=0d0
-   barostat%mass=barostat_mass
+   barostat%force=0d0;  barostat%momentum=0d0; barostat%velocity=0d0
+   barostat%mass = KbT*(100d0*dt)**2*(3*GNATOMS+3)
+   do ia=1,3
+   do ib=1,3
+      barostat%pos(ia,ib) = HH(ia,ib,0)
+   enddo; enddo
 
-   KbT = treq
+   if(myid==0) print'(a,es15.5)', 'barostat%mass: ', barostat%mass
 
 else if(is_nvt) then
 
-   nhc_particle = nhc_ctor(num=num_chain_particle, mass=chain_mass_particle)
+   nhc_particle = nhc_ctor(num=num_chain_particle, ctime=100d0*dt)
 
-   KbT = treq
 endif
 
 dt2 = dt*0.5d0
@@ -317,7 +307,7 @@ subroutine nhc_update_chains(nhc, barostat)
    else
       kene = get_kinetic_energy()*2d0
       NKbT = 3d0*GNATOMS*KbT
-      if(myid==0) print'(a,l,2es15.5)','kene,NKbT: ', present(barostat),kene, NKbT
+      !if(myid==0) print'(a,l,2es15.5)','kene,NKbT: ', present(barostat),kene, NKbT
    endif
 
    !NOTE: momentum(num_chains+1) is always zero so that exp1=exp2=1.0
@@ -340,10 +330,16 @@ subroutine nhc_update_chains(nhc, barostat)
 
    scaling_factor = exp(-dt2*nhc%momentum(1)/nhc%mass(1))
 
-   if(myid==0) print'(a,l,9es15.5)','scaling_factor,momentum,force: ', &
-   present(barostat), scaling_factor, nhc%momentum(1), nhc%force(1), KbT
+   !if(myid==0) print'(a,l,9es15.5)','scaling_factor,momentum,force: ', &
+   !present(barostat), scaling_factor, nhc%momentum(1), nhc%force(1), KbT
 
    if(present(barostat)) then
+!if(myid==0) then
+!print'(a,3f15.5)', 'barostat%momentum: ', barostat%momentum(1:3,1)
+!print'(a,3f15.5)', 'barostat%momentum: ', barostat%momentum(1:3,2)
+!print'(a,3f15.5)', 'barostat%momentum: ', barostat%momentum(1:3,3)
+!print'(a,3f15.5)', 'scaling_factor: ', scaling_factor
+!endif
       barostat%momentum = barostat%momentum*scaling_factor
    else
       v(1:NATOMS,1:3) = v(1:NATOMS,1:3)*scaling_factor
@@ -370,7 +366,7 @@ end subroutine
 function get_pint() result(pint)
 !-----------------------------------------------------------------------
 integer :: i,ity, ia, ib
-real(8) :: pint(3,3), pint0(3,3)
+real(8) :: pint(3,3), pint0(3,3), volume
 
 pint0=0.d0
 do i=1, NATOMS
@@ -382,6 +378,7 @@ do i=1, NATOMS
    enddo; enddo
 enddo
 
+
 !--- symmetrize internal pressure
 do ia=1,3
 do ib=1,3
@@ -389,6 +386,9 @@ do ib=1,3
 enddo; enddo
 
 call MPI_ALLREDUCE(MPI_IN_PLACE, pint, size(pint), MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_WORLD, ierr)
+
+volume = get_determinant(barostat%pos)
+pint = pint/volume
 
 return
 end function

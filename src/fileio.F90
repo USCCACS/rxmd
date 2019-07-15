@@ -460,7 +460,8 @@ integer :: fh ! file handler
 integer :: nmeta
 integer,allocatable :: idata(:)
 real(8),allocatable :: dbuf(:)
-real(8) :: ddata(6), d10(10)
+!real(8) :: ddata(6), d10(10)
+real(8) :: ddata(9), d10(10)
 
 real(8) :: rnorm(NBUFFER,3), mat(3,3)
 integer :: j
@@ -476,7 +477,8 @@ call system_clock(ti,tk)
 
 nmeta=4+nprocs+1
 allocate(idata(nmeta))
-metaDataSize = 4*nmeta + 8*6
+!metaDataSize = 4*nmeta + 8*6
+metaDataSize = 4*nmeta + 8*9
 
 call MPI_File_Open(MPI_COMM_WORLD,trim(fileName),MPI_MODE_RDONLY,MPI_INFO_NULL,fh,ierr)
 
@@ -487,13 +489,17 @@ call MPI_File_Read(fh,idata,nmeta,MPI_INTEGER,MPI_STATUS_IGNORE,ierr)
 
 offsettmp=4*nmeta
 call MPI_File_Seek(fh,offsettmp,MPI_SEEK_SET,ierr)
-call MPI_File_Read(fh,ddata,6,MPI_DOUBLE_PRECISION,MPI_STATUS_IGNORE,ierr)
+!call MPI_File_Read(fh,ddata,6,MPI_DOUBLE_PRECISION,MPI_STATUS_IGNORE,ierr)
+call MPI_File_Read(fh,ddata,9,MPI_DOUBLE_PRECISION,MPI_STATUS_IGNORE,ierr)
 
 NATOMS = idata(4+myid+1)
 current_step = idata(nmeta)
 deallocate(idata)
-lata=ddata(1); latb=ddata(2); latc=ddata(3)
-lalpha=ddata(4); lbeta=ddata(5); lgamma=ddata(6)
+!lata=ddata(1); latb=ddata(2); latc=ddata(3)
+!lalpha=ddata(4); lbeta=ddata(5); lgamma=ddata(6)
+HH(1,1:3,0)=ddata(1:3)
+HH(2,1:3,0)=ddata(4:6)
+HH(3,1:3,0)=ddata(7:9)
 
 ! Get local datasize: 10 doubles for each atoms
 localDataSize = 8*NATOMS*10
@@ -539,11 +545,14 @@ deallocate(dbuf)
 call MPI_BARRIER(MPI_COMM_WORLD, ierr)
 call MPI_File_Close(fh,ierr)
 
-call GetBoxParams(mat,lata,latb,latc,lalpha,lbeta,lgamma)
-do i=1, 3
-do j=1, 3
-   HH(i,j,0)=mat(i,j)
-enddo; enddo
+!call GetBoxParams(mat,lata,latb,latc,lalpha,lbeta,lgamma)
+!do i=1, 3
+!do j=1, 3
+!   HH(i,j,0)=mat(i,j)
+!enddo; enddo
+lata=sqrt(sum(HH(1:3,1,0)*HH(1:3,1,0)))
+latb=sqrt(sum(HH(1:3,2,0)*HH(1:3,2,0)))
+latc=sqrt(sum(HH(1:3,3,0)*HH(1:3,3,0)))
 call UpdateBoxParams()
 
 call xs2xu(NATOMS,rnorm,rreal)
@@ -572,7 +581,8 @@ integer :: fh ! file handler
 
 integer :: nmeta
 integer,allocatable :: ldata(:),gdata(:)
-real(8) :: ddata(6)
+!real(8) :: ddata(6)
+real(8) :: ddata(9)
 real(8),allocatable :: dbuf(:)
 
 real(8) :: rnorm(NBUFFER,3)
@@ -589,7 +599,8 @@ if(.not. isBinary) return
 !  Number of resident atoms per each MPI rank (nprocs integers) 
 !  current step (1 integer) + lattice parameters (6 doubles)
 nmeta=4+nprocs+1
-metaDataSize = 4*nmeta + 8*6
+!metaDataSize = 4*nmeta + 8*6
+metaDataSize = 4*nmeta + 8*9
 
 ! Get local datasize: 10 doubles for each atoms
 localDataSize = 8*NATOMS*10
@@ -612,8 +623,11 @@ gdata(1)=nprocs
 gdata(2:4)=vprocs
 gdata(nmeta)=nstep+current_step
 
-ddata(1)=lata; ddata(2)=latb; ddata(3)=latc
-ddata(4)=lalpha; ddata(5)=lbeta; ddata(6)=lgamma
+!ddata(1)=lata; ddata(2)=latb; ddata(3)=latc
+!ddata(4)=lalpha; ddata(5)=lbeta; ddata(6)=lgamma
+ddata(1:3)=HH(1,1:3,0)
+ddata(4:6)=HH(2,1:3,0)
+ddata(7:9)=HH(3,1:3,0)
 
 if(myid==0) then
    offsettmp=0
@@ -622,7 +636,8 @@ if(myid==0) then
 
    offsettmp=4*nmeta
    call MPI_File_Seek(fh,offsettmp,MPI_SEEK_SET,ierr)
-   call MPI_File_Write(fh,ddata,6,MPI_DOUBLE_PRECISION,MPI_STATUS_IGNORE,ierr)
+   !call MPI_File_Write(fh,ddata,6,MPI_DOUBLE_PRECISION,MPI_STATUS_IGNORE,ierr)
+   call MPI_File_Write(fh,ddata,9,MPI_DOUBLE_PRECISION,MPI_STATUS_IGNORE,ierr)
 endif
 deallocate(ldata,gdata)
 
