@@ -13,7 +13,7 @@ real(8),parameter :: chain_mass_barostat = 5.d0
 real(8),parameter :: barostat_mass = 200d0
 
 !--- external pressure
-real(8),parameter :: Pext = 1d0/3.7255d0 ! 1unit = 3.7255 [TPa]
+real(8),parameter :: Pext = 1.d0*USTRS ! [Gpa]
 real(8) :: dt2, dt4, dt8
 
 logical :: is_nvt=.false., is_npt=.false.
