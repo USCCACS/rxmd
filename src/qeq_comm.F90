@@ -1,5 +1,5 @@
 !--------------------------------------------------------------------------------------------------------------
-subroutine COPYATOMS_QEQ(imode, dr, atype, pos, v, f, q)
+subroutine COPYATOMS_QEQ(imode, dr, atype, pos, v, f, q, commflag_qeq,comm_type)
 use atoms
 !
 ! TODO: update notes here
@@ -40,14 +40,16 @@ type pack1darray
    character(8) :: name=''
 end type 
 
-integer,intent(IN) :: imode 
+integer,intent(IN) :: imode,comm_type 
 real(8),intent(IN) :: dr(3)
 real(8),target :: atype(NBUFFER), q(NBUFFER)
 real(8),target :: pos(NBUFFER,3),v(NBUFFER,3),f(NBUFFER,3)
 
 real(8),target :: nipos(NBUFFER,3)  
 
-logical :: commflag(NBUFFER)
+!logical :: commflag(NBUFFER)
+logical :: commflag_qeq(6,NBUFFER)
+
 type(pack1darray),allocatable :: pack1d(:)
 type(pack2darray),allocatable :: pack2d(:)
 type(pack2darray),allocatable :: norm2d(:)
@@ -63,7 +65,7 @@ integer,parameter :: is_xyz(6)=(/1,1,2,2,3,3/)  !<- [xxyyzz]
 
 call system_clock(tti,tk)
 
-call initialize_qeq(imode)
+call initialize_01qeq(imode)
 
 do dflag=1, 6
 
@@ -77,18 +79,24 @@ do dflag=1, 6
       ixyz = is_xyz(7-dflag)        ! <-[332211]
    endif
 
-   call step_preparation_qeq(dflag, dr, commflag)
+   if (comm_type == 1) then
+      call step_preparation_01qeq(dflag, dr)
+   end if
 
-   call store_atoms_qeq(tn1, dflag, imode)
-   call send_recv_qeq(tn1, tn2, myparity(ixyz),dflag)
-   call append_atoms_qeq(dflag, imode)
+   call store_atoms_01qeq(tn1, dflag, imode,comm_type)
+   if (comm_type == 1) then
+      call send_recv_01qeq(tn1, tn2, myparity(ixyz))
+   else
+      call send_recv_02qeq(tn1, tn2, myparity(ixyz))
+   end if
+   call append_atoms_01qeq(dflag, imode,comm_type)
 
 enddo
 
-call finalize_qeq(imode)
+call finalize_01qeq(imode)
 
-!write(*,*)  "MPI q_send    stats: ",myid,ns_atoms(1:6)
-!write(*,*)  "MPI q_receive stats: ",myid,nr_atoms(1:6)
+!write(*,*)  "MPI send stats: ",myid,ns_atoms(1:6)
+!write(*,*)  "MPI receive stats: ",myid,nr_atoms(1:6)
 
 !--- for array size stat
 if(mod(nstep,pstep)==0) then
@@ -104,7 +112,7 @@ return
 
 CONTAINS 
 !--------------------------------------------------------------------------------------------------------------
-subroutine initialize_qeq(imode)
+subroutine initialize_01qeq(imode)
 implicit none
 !--------------------------------------------------------------------------------------------------------------
 integer,intent(in) :: imode
@@ -232,7 +240,7 @@ endif
 end subroutine
 
 !--------------------------------------------------------------------------------------------------------------
-subroutine finalize_qeq(imode)
+subroutine finalize_01qeq(imode)
 implicit none
 !--------------------------------------------------------------------------------------------------------------
 integer,intent(in) :: imode
@@ -273,25 +281,100 @@ if(allocated(norm2d)) deallocate(norm2d)
 end subroutine
 
 !--------------------------------------------------------------------------------------------------------------
-subroutine step_preparation_qeq(dflag, dr, commflag)
+subroutine step_preparation_01qeq(dflag, dr)
 implicit none
 !--------------------------------------------------------------------------------------------------------------
 integer,intent(in) :: dflag
 real(8),intent(in) :: dr(3)
-logical,intent(inout) :: commflag(NBUFFER)
 integer :: i
 
 !--- start buffering data depending on modes. all copy&move modes use buffer size, dr, to select atoms.
+commflag_qeq(dflag,:) = .FALSE.
 do i=1, copyptr(cptridx(dflag))
-   commflag(i) = inBuffer_qeq(dflag,dr,pos(i,is_xyz(dflag)))
+   commflag_qeq(dflag,i) = inBuffer_01qeq(dflag,dr,pos(i,is_xyz(dflag)))
 enddo
 
 return
 end subroutine
 
+!--------------------------------------------------------------------------------------------------------------
+subroutine send_recv_01qeq(tn1, tn2, mypar)
+use atoms
+! shared variables::  <ns>, <nr>, <na>, <sbuffer()>, <rbuffer()>
+! This subroutine only takes care of communication part. won't be affected by wether atom migration or atom 
+! copy mode. 
+!--------------------------------------------------------------------------------------------------------------
+implicit none
+integer,intent(IN) ::tn1, tn2, mypar 
+integer :: recv_stat(MPI_STATUS_SIZE)
+real(8) :: recv_size
+
+!--- if myid is the same of target-node ID, don't use MPI call.
+!--- Just copy <sbuffer> to <rbuffer>. Because <send_recv()> will not be used,
+!--- <nr> has to be updated here for <append_atoms()>.
+if(myid==tn1) then
+   if(ns>0) then
+      nr=ns
+      call CheckSizeThenReallocate_01qeq(rbuffer,nr)
+      rbuffer(1:ns) = sbuffer(1:ns)
+   else
+      nr=0
+   endif
+
+   return
+endif
+
+call system_clock(ti,tk)
+
+if (mypar == 0) then
+
+     ! the number of elements per data packet has to be greater than 1, for example NE_COPY = 10.
+     ! if ns == 0, send one double to tell remote rank that there will be no atom data to be sent. 
+     if (ns > 0) then 
+       call MPI_SEND(sbuffer, ns, MPI_DOUBLE_PRECISION, tn1, 10, MPI_COMM_WORLD, ierr)
+     else
+       call MPI_SEND(1, 1, MPI_DOUBLE_PRECISION, tn1, 10, MPI_COMM_WORLD, ierr)
+     endif
+
+     call MPI_Probe(tn2, 11, MPI_COMM_WORLD, recv_stat, ierr)
+     call MPI_Get_count(recv_stat, MPI_DOUBLE_PRECISION, nr, ierr)
+
+     call CheckSizeThenReallocate_01qeq(rbuffer,nr)
+
+     call MPI_RECV(rbuffer, nr, MPI_DOUBLE_PRECISION, tn2, 11, MPI_COMM_WORLD, recv_stat, ierr)
+
+     ! the number of elements per data packet has to be greater than 1, for example NE_COPY = 10.
+     ! nr == 1 means no atom data to be received. 
+     if(nr==1) nr=0 
+
+elseif (mypar == 1) then
+
+     call MPI_Probe(tn2, 10, MPI_COMM_WORLD, recv_stat, ierr)
+     call MPI_Get_count(recv_stat, MPI_DOUBLE_PRECISION, nr, ierr)
+
+     call CheckSizeThenReallocate_01qeq(rbuffer,nr)
+
+     call MPI_RECV(rbuffer, nr, MPI_DOUBLE_PRECISION, tn2, 10, MPI_COMM_WORLD, recv_stat, ierr)
+
+     ! the number of elements per data packet has to be greater than 1, for example NE_COPY = 10.
+     ! nr == 1 means no atom data to be received. 
+     if(nr==1) nr=0 
+
+     if (ns > 0) then
+        call MPI_SEND(sbuffer, ns, MPI_DOUBLE_PRECISION, tn1, 11, MPI_COMM_WORLD, ierr)
+     else
+        call MPI_SEND(1, 1, MPI_DOUBLE_PRECISION, tn1, 11, MPI_COMM_WORLD, ierr)
+     endif
+
+endif
+
+call system_clock(tj,tk)
+it_timer(25)=it_timer(25)+(tj-ti)
+
+end subroutine
 
 !--------------------------------------------------------------------------------------------------------------
-subroutine send_recv_qeq(tn1, tn2, mypar, dflag)
+subroutine send_recv_02qeq(tn1, tn2, mypar)
 use atoms
 ! shared variables::  <ns>, <nr>, <na>, <sbuffer()>, <rbuffer()>
 ! This subroutine only takes care of communication part. won't be affected by wether atom migration or atom 
@@ -343,7 +426,7 @@ it_timer(25)=it_timer(25)+(tj-ti)
 end subroutine
 
 !--------------------------------------------------------------------------------------------------------------
-subroutine store_atoms_qeq(tn, dflag, imode)
+subroutine store_atoms_01qeq(tn, dflag, imode,comm_type)
 use atoms
 ! <nlayer> will be used as a flag to change the behavior of this subroutine. 
 !    <nlayer>==0 migration mode
@@ -351,7 +434,7 @@ use atoms
 ! shared variables::  <ns>, <nr>, <na>, <ne>, <sbuffer()>, <rbuffer()>
 !--------------------------------------------------------------------------------------------------------------
 implicit none
-integer,intent(IN) :: tn, dflag, imode 
+integer,intent(IN) :: tn, dflag, imode, comm_type 
 
 integer :: n,ni,is,a,b,ioffset
 real(8) :: sft 
@@ -366,7 +449,7 @@ if(imode==MODE_CPBK) then
    is = 7 - dflag !<- [654321] reversed order direction flag
 
    n = copyptr(is) - copyptr(is-1) + 1
-   call CheckSizeThenReallocate_qeq(sbuffer,n*ne)
+   call CheckSizeThenReallocate_01qeq(sbuffer,n*ne)
 
    do n=copyptr(is-1)+1, copyptr(is)
       sbuffer(ns+1) = dble(frcindx(n))
@@ -380,19 +463,19 @@ else
    ni = copyptr(cptridx(dflag))*ne
 
 !--- <sbuffer> will deallocated in store_atoms.
-   call CheckSizeThenReallocate_qeq(sbuffer,ni)
+   call CheckSizeThenReallocate_01qeq(sbuffer,ni)
 
 !--- get the coordinate Index to be Shifted.
    is = int((dflag-1)/2) !<- [012] means [xyz]
 
 !--- When atom moves to neighbor nodes, their coordinates must be shifted. 
 !--- xshift() returns the edge length of one node assuming all of node size is same.
-   sft=xshift_qeq(dflag)
+   sft=xshift_01qeq(dflag)
 
 !--- start buffering data depending on modes. all copy&move modes use buffer size, dr, to select atoms.
    do n=1, copyptr(cptridx(dflag))
 
-      if(commflag(n)) then
+      if(commflag_qeq(dflag,n)) then
 
         ioffset=ns
 
@@ -426,24 +509,28 @@ else
 
 endif
 
-if  ( ns_atoms(dflag) .NE. (ns/ne) )  then
-  write(*,*) "number of atoms to be send does not match for ",myid
-  call MPI_FINALIZE(ierr)
+if (comm_type .eq. 1) then
+! store the number of atoms being transfered in dflag direction
+   ns_atoms(dflag)= ns/ne
+else
+   if  ( ns_atoms(dflag) .NE. (ns/ne) )  then
+       write(*,*) "number of atoms to be send does not match for ",myid
+   end if
 end if
 
 call system_clock(tj,tk)
 it_timer(26)=it_timer(26)+(tj-ti)
 
-end subroutine store_atoms_qeq
+end subroutine store_atoms_01qeq
 
 !--------------------------------------------------------------------------------------------------------------
-subroutine append_atoms_qeq(dflag, imode)
+subroutine append_atoms_01qeq(dflag, imode, comm_type)
 use atoms
 ! <append_atoms> append copied information into arrays
 ! shared variables::  <ns>, <nr>, <na>, <ne>, <sbuffer()>, <rbuffer()>
 !--------------------------------------------------------------------------------------------------------------
 implicit none
-integer,intent(IN) :: dflag, imode 
+integer,intent(IN) :: dflag, imode, comm_type 
 integer :: m, i, ine, a, ioffset
 
 call system_clock(ti,tk)
@@ -474,10 +561,15 @@ else
       copyptr(dflag) = copyptr(dflag-1) + nr/ne
    endif
 
-if  (nr_atoms(dflag) .NE.  (nr/ne)) then
-   write(*,*) "number of atoms received does not match for ",myid
-   call MPI_FINALIZE(ierr)
+if (comm_type == 1) then   
+   ! number of atomd received from the neighbor
+   nr_atoms(dflag)= nr/ne
+else
+   if (nr_atoms(dflag) .NE.  (nr/ne)) then
+       write(*,*) "number of atoms received does not match for ",myid
+   end if
 end if
+
 !--- go over the buffered atom
    do i=0, nr/ne-1
 
@@ -513,10 +605,10 @@ na=na+nr
 call system_clock(tj,tk)
 it_timer(27)=it_timer(27)+(tj-ti)
 
-end subroutine append_atoms_qeq
+end subroutine append_atoms_01qeq
 
 !--------------------------------------------------------------------------------------------------------------
-real(8) function xshift_qeq(dflag)
+real(8) function xshift_01qeq(dflag)
 use atoms
 ! This subroutine returns a correction value in coordinate for transfered atoms.
 !--------------------------------------------------------------------------------------------------------------
@@ -527,16 +619,16 @@ integer :: i, j
   i = mod(dflag,2)  !<- i=1 means positive, i=0 means negative direction 
 
   if(i==1) then
-      xshift_qeq =-lbox(is_xyz(dflag))
+      xshift_01qeq =-lbox(is_xyz(dflag))
   else if(i==0) then
-      xshift_qeq = lbox(is_xyz(dflag))
+      xshift_01qeq = lbox(is_xyz(dflag))
   endif
    
 !print'(a,i,3f10.3)',"shift: ",myid, xshift
 end function
 
 !--------------------------------------------------------------------------------------------------------------
-function inBuffer_qeq(dflag, dr, rr) result(isInside)
+function inBuffer_01qeq(dflag, dr, rr) result(isInside)
 use atoms
 !--------------------------------------------------------------------------------------------------------------
 implicit none
@@ -564,7 +656,7 @@ end select
 end function
 
 !--------------------------------------------------------------------------------------------------------------
-subroutine CheckSizeThenReallocate_qeq(buffer,nsize)
+subroutine CheckSizeThenReallocate_01qeq(buffer,nsize)
 implicit none
 !--------------------------------------------------------------------------------------------------------------
 real(8),allocatable :: buffer(:)
@@ -582,4 +674,4 @@ endif
 
 end subroutine
 
-end subroutine COPYATOMS_QEQ
+end subroutine COPYATOMS_01qeq

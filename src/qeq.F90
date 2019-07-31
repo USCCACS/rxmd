@@ -26,6 +26,8 @@ real(8) :: ssum, tsum, mu
 real(8) :: qsum, gqsum
 real(8) :: QCopyDr(3)
 real(8) :: hshs_sum,hsht_sum
+logical :: commflag_qeq(6,NBUFFER)
+integer :: comm_type
 
 call system_clock(i1,k1)
 
@@ -67,9 +69,10 @@ open(91,file="qeqdump"//trim(rankToString(myid))//".txt")
 #endif
 
 !--- copy atomic coords and types from neighbors, used in qeq_initialize()
-call COPYATOMS(MODE_COPY, QCopyDr, atype, pos, vdummy, fdummy, q)
+comm_type = 1
+call COPYATOMS_QEQ(MODE_COPY, QCopyDr, atype, pos, vdummy, fdummy, q,commflag_qeq,comm_type)
 call LINKEDLIST(atype, pos, nblcsize, nbheader, nbllist, nbnacell, nbcc, MAXLAYERS_NB)
-
+comm_type = 2
 call qeq_initialize()
 
 #ifdef QEQDUMP 
@@ -83,14 +86,14 @@ enddo
 
 !--- after the initialization, only the normalized coords are necessary for COPYATOMS_QEQ()
 !--- The atomic coords are converted back to real at the end of this function.
-call COPYATOMS_QEQ(MODE_QCOPY1,QCopyDr, atype, pos, vdummy, fdummy, q)
+call COPYATOMS_QEQ(MODE_QCOPY1,QCopyDr, atype, pos, vdummy, fdummy, q,commflag_qeq,comm_type)
 call get_gradient(Gnew)
 
 !--- Let the initial CG direction be the initial gradient direction
 hs(1:NATOMS) = gs(1:NATOMS)
 ht(1:NATOMS) = gt(1:NATOMS)
 
-call COPYATOMS_QEQ(MODE_QCOPY2,QCopyDr, atype, pos, vdummy, fdummy, q)
+call COPYATOMS_QEQ(MODE_QCOPY2,QCopyDr, atype, pos, vdummy, fdummy, q,commflag_qeq,comm_type)
 
 GEst2=1.d99
 do nstep_qeq=0, nmax-1
@@ -150,7 +153,7 @@ do nstep_qeq=0, nmax-1
   q(1:NATOMS) = qs(1:NATOMS) - mu*qt(1:NATOMS)
 
 !--- update new charges of buffered atoms.
-  call COPYATOMS_QEQ(MODE_QCOPY1,QCopyDr, atype, pos, vdummy, fdummy, q)
+  call COPYATOMS_QEQ(MODE_QCOPY1,QCopyDr, atype, pos, vdummy, fdummy, q,commflag_qeq,comm_type))
 
 !--- save old residues.  
   Gold(:) = Gnew(:)
@@ -161,7 +164,7 @@ do nstep_qeq=0, nmax-1
   ht(1:NATOMS) = gt(1:NATOMS) + (Gnew(2)/Gold(2))*ht(1:NATOMS)
 
 !--- update new conjugate direction for buffered atoms.
-  call COPYATOMS_QEQ(MODE_QCOPY2,QCopyDr, atype, pos, vdummy, fdummy, q)
+  call COPYATOMS_QEQ(MODE_QCOPY2,QCopyDr, atype, pos, vdummy, fdummy, q,commflag_qeq,comm_type))
 
 enddo
 
