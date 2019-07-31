@@ -153,7 +153,7 @@ do nstep_qeq=0, nmax-1
   q(1:NATOMS) = qs(1:NATOMS) - mu*qt(1:NATOMS)
 
 !--- update new charges of buffered atoms.
-  call COPYATOMS_QEQ(MODE_QCOPY1,QCopyDr, atype, pos, vdummy, fdummy, q,commflag_qeq,comm_type))
+  call COPYATOMS_QEQ(MODE_QCOPY1,QCopyDr, atype, pos, vdummy, fdummy, q,commflag_qeq,comm_type)
 
 !--- save old residues.  
   Gold(:) = Gnew(:)
@@ -164,7 +164,7 @@ do nstep_qeq=0, nmax-1
   ht(1:NATOMS) = gt(1:NATOMS) + (Gnew(2)/Gold(2))*ht(1:NATOMS)
 
 !--- update new conjugate direction for buffered atoms.
-  call COPYATOMS_QEQ(MODE_QCOPY2,QCopyDr, atype, pos, vdummy, fdummy, q,commflag_qeq,comm_type))
+  call COPYATOMS_QEQ(MODE_QCOPY2,QCopyDr, atype, pos, vdummy, fdummy, q,commflag_qeq,comm_type)
 
 enddo
 

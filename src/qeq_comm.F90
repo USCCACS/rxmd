@@ -87,7 +87,7 @@ do dflag=1, 6
    if (comm_type == 1) then
       call send_recv_01qeq(tn1, tn2, myparity(ixyz))
    else
-      call send_recv_02qeq(tn1, tn2, myparity(ixyz))
+      call send_recv_02qeq(tn1, tn2, myparity(ixyz),dflag)
    end if
    call append_atoms_01qeq(dflag, imode,comm_type)
 
@@ -315,7 +315,7 @@ real(8) :: recv_size
 if(myid==tn1) then
    if(ns>0) then
       nr=ns
-      call CheckSizeThenReallocate_01qeq(rbuffer,nr)
+      call CheckSizeThenReallocate_qeq(rbuffer,nr)
       rbuffer(1:ns) = sbuffer(1:ns)
    else
       nr=0
@@ -339,7 +339,7 @@ if (mypar == 0) then
      call MPI_Probe(tn2, 11, MPI_COMM_WORLD, recv_stat, ierr)
      call MPI_Get_count(recv_stat, MPI_DOUBLE_PRECISION, nr, ierr)
 
-     call CheckSizeThenReallocate_01qeq(rbuffer,nr)
+     call CheckSizeThenReallocate_qeq(rbuffer,nr)
 
      call MPI_RECV(rbuffer, nr, MPI_DOUBLE_PRECISION, tn2, 11, MPI_COMM_WORLD, recv_stat, ierr)
 
@@ -352,7 +352,7 @@ elseif (mypar == 1) then
      call MPI_Probe(tn2, 10, MPI_COMM_WORLD, recv_stat, ierr)
      call MPI_Get_count(recv_stat, MPI_DOUBLE_PRECISION, nr, ierr)
 
-     call CheckSizeThenReallocate_01qeq(rbuffer,nr)
+     call CheckSizeThenReallocate_qeq(rbuffer,nr)
 
      call MPI_RECV(rbuffer, nr, MPI_DOUBLE_PRECISION, tn2, 10, MPI_COMM_WORLD, recv_stat, ierr)
 
@@ -374,7 +374,7 @@ it_timer(25)=it_timer(25)+(tj-ti)
 end subroutine
 
 !--------------------------------------------------------------------------------------------------------------
-subroutine send_recv_02qeq(tn1, tn2, mypar)
+subroutine send_recv_02qeq(tn1, tn2, mypar, dflag)
 use atoms
 ! shared variables::  <ns>, <nr>, <na>, <sbuffer()>, <rbuffer()>
 ! This subroutine only takes care of communication part. won't be affected by wether atom migration or atom 
@@ -411,7 +411,9 @@ if (ns >0) then
 else
     call MPI_Isend(1,1,MPI_DOUBLE_PRECISION,tn1,10,MPI_COMM_WORLD,send_request,ierr)
 end if
+
 nr = nr_atoms(dflag)*ne
+call CheckSizeThenReallocate_qeq(rbuffer,nr)
 call MPI_Irecv(rbuffer,nr,MPI_DOUBLE_PRECISION,tn2,10,MPI_COMM_WORLD,recv_request,ierr)
 if(nr==1) nr=0
 
@@ -449,7 +451,7 @@ if(imode==MODE_CPBK) then
    is = 7 - dflag !<- [654321] reversed order direction flag
 
    n = copyptr(is) - copyptr(is-1) + 1
-   call CheckSizeThenReallocate_01qeq(sbuffer,n*ne)
+   call CheckSizeThenReallocate_qeq(sbuffer,n*ne)
 
    do n=copyptr(is-1)+1, copyptr(is)
       sbuffer(ns+1) = dble(frcindx(n))
@@ -463,7 +465,7 @@ else
    ni = copyptr(cptridx(dflag))*ne
 
 !--- <sbuffer> will deallocated in store_atoms.
-   call CheckSizeThenReallocate_01qeq(sbuffer,ni)
+   call CheckSizeThenReallocate_qeq(sbuffer,ni)
 
 !--- get the coordinate Index to be Shifted.
    is = int((dflag-1)/2) !<- [012] means [xyz]
@@ -656,7 +658,7 @@ end select
 end function
 
 !--------------------------------------------------------------------------------------------------------------
-subroutine CheckSizeThenReallocate_01qeq(buffer,nsize)
+subroutine CheckSizeThenReallocate_qeq(buffer,nsize)
 implicit none
 !--------------------------------------------------------------------------------------------------------------
 real(8),allocatable :: buffer(:)
@@ -674,4 +676,4 @@ endif
 
 end subroutine
 
-end subroutine COPYATOMS_01qeq
+end subroutine COPYATOMS_QEQ
