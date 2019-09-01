@@ -1,6 +1,7 @@
 module lists_mod
 
   use mpi_mod
+  implicit none
 
 contains
 
@@ -10,7 +11,6 @@ use utils, only : xu2xs
 use base, only : hhi, obox, copyptr, it_timer
 ! partitions the volume into linked-list cells <lcsize>
 !----------------------------------------------------------------------------------------
-implicit none
 real(8),allocatable,intent(in) :: atype(:), rreal(:,:)
 real(8),intent(in) ::  cellDims(3)
 
@@ -56,7 +56,6 @@ use base, only : natoms, myid, maxneighbs, nbrlist, header, llist, nacell, &
 use atoms, only : nbrindx, maxas
 !----------------------------------------------------------------------
 ! calculate neighbor list for atoms witin cc(1:3, -nlayer:nlayer) cells.
-implicit none
 integer,intent(in) :: nlayer
 real(8),allocatable,intent(in) :: atype(:), pos(:,:)
 integer,allocatable,intent(in) :: pair_types(:,:)
@@ -156,20 +155,21 @@ it_timer(5)=it_timer(5)+(tj-ti)
 end subroutine
 
 !----------------------------------------------------------------------
-subroutine GetNonbondingPairList(pos)
+subroutine get_nonbonding_list(pos, rcut)
 use base, only : it_timer
-use atoms, only : nbnmesh, rctap2, nbheader, nbmesh, nbplist, &
+use atoms, only : nbnmesh, nbheader, nbmesh, nbplist, &
                   nbllist, nbnacell, nbcc
 !----------------------------------------------------------------------
-implicit none
-
 real(8),allocatable,intent(in) :: pos(:,:)
+real(8),intent(in) :: rcut
 
 integer :: c1,c2,c3,c4,c5,c6,i,j,m,n,mn,iid,jid
-real(8) :: dr(3), dr2
+real(8) :: dr(3), dr2, rcut2
 
 integer :: ti,tj,tk
 call system_clock(ti,tk)
+
+rcut2 = rcut*rcut
 
 ! reset non-bonding pair list
 nbplist(0,:)=0
@@ -195,7 +195,7 @@ do c3=0, nbcc(3)-1
                dr(1:3) = pos(i,1:3) - pos(j,1:3)
                dr2 = sum(dr(1:3)*dr(1:3))
 
-               if(dr2<=rctap2) then
+               if(dr2<=rcut2) then
                  nbplist(0,i)=nbplist(0,i)+1
                  nbplist(nbplist(0,i),i)=j
                endif
@@ -217,14 +217,16 @@ it_timer(15)=it_timer(15)+(tj-ti)
 end subroutine
 
 !----------------------------------------------------------------
-subroutine GetNonbondingMesh()
+subroutine get_mesh_for_nonbonding_list(rcut)
 ! setup 10[A] radius mesh to avoid visiting unecessary cells 
 !----------------------------------------------------------------
 use base, only : lata, latb, latc, vprocs, nbuffer
-use atoms, only : maxlayers_nb, rctap, nblcsize, &
+use atoms, only : maxlayers_nb, nblcsize, &
                   nbheader, nbllist, nbmesh, nbnacell, nbnmesh, nbcc
 use memory_allocator_mod
 implicit none
+
+real(8),intent(in) :: rcut
 
 real(8) :: maxrcell
 real(8) :: latticePerNode(3), rr(3), dr2
@@ -243,7 +245,7 @@ nblcsize(1:3)=latticePerNode(1:3)/nbcc(1:3)
 maxrcell = maxval(nblcsize(1:3))
 
 !--- get # of linked list cell to cover up the non-bonding cutoff length
-imesh(1:3)  = int(rctap/nblcsize(1:3)) + 1
+imesh(1:3)  = int(rcut/nblcsize(1:3)) + 1
 maximesh = maxval(imesh(1:3))
 
 !--- List up only cell indices within the cutoff range.
@@ -262,7 +264,7 @@ do k=-imesh(3), imesh(3)
    enddo
    rr(1:3) = ii(1:3)*nblcsize(1:3)
    dr2 = sum(rr(1:3)*rr(1:3))
-   if(dr2 <= rctap**2) nbnmesh = nbnmesh + 1
+   if(dr2 <= rcut**2) nbnmesh = nbnmesh + 1
 enddo; enddo; enddo
 
 call allocator(nbmesh,1,3,1,nbnmesh)
@@ -282,7 +284,7 @@ do k=-imesh(3), imesh(3)
    enddo
    rr(1:3) = ii(1:3)*nblcsize(1:3)
    dr2 = sum(rr(1:3)*rr(1:3))
-   if(dr2 <= rctap**2) then
+   if(dr2 <= rcut**2) then
       nbnmesh = nbnmesh + 1
       nbmesh(1:3,nbnmesh) = (/i, j, k/)
    endif

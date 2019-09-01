@@ -545,7 +545,7 @@ module fnn
   use mpi_mod
 
   use base
-  use lists_mod, only : getnonbondingmesh, linkedlist
+  use lists_mod, only : get_mesh_for_nonbonding_list, linkedlist
   use communication_mod, only : copyatoms
   use msd_mod, only : msd_data
 

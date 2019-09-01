@@ -15,7 +15,7 @@ module init
                   network_ctor, mean_stddev_loader, num_forcecomps, num_pairs, num_types, & 
                   mddriver_fnn, get_max_cutoff
 
-  use lists_mod, only: getnonbondingmesh 
+  use lists_mod, only: get_mesh_for_nonbonding_list 
 
   use fnnin_parser, only : fnn_param_ctor, set_feature_tables_fnn
 
@@ -115,7 +115,7 @@ else
 !--- get cutoff distance based on the bond-order
   call get_cutoff_bondorder(rc, rc2, maxrc, natoms_per_type)
 !--- setup 10[A] radius mesh to avoid visiting unecessary cells 
-  call GetNonbondingMesh()
+  call get_mesh_for_nonbonding_list(rctap)
 endif
 
 !--- index array for returning reaction force

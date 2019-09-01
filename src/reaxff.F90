@@ -188,7 +188,8 @@ do nstep=0, num_mdsteps-1
    pos(1:NATOMS,1:3)=pos(1:NATOMS,1:3)+dt*v(1:NATOMS,1:3)
 
 !--- migrate atoms after positions are updated
-   call COPYATOMS(imode=MODE_MOVE,dr=[0.d0, 0.d0, 0.d0],atype=atype,pos=pos,v=v,f=f,q=q)
+   call COPYATOMS(imode=MODE_MOVE,dr=[0.d0, 0.d0, 0.d0],atype=atype,pos=pos, &
+                  v=v,f=f,q=q,ipos=ipos)
    
    if(mod(nstep,qstep)==0) call charge_model_func(atype, pos, q)
    call force_model_func(natoms, atype, pos, f, q)

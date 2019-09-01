@@ -4,6 +4,7 @@ module force_mod
                    ipos, isSpring, springconst, hasspringforce
   use reaxff_param_mod
   use bo_mod
+  use lists_mod, only : get_nonbonding_list
 
 contains
 
@@ -37,7 +38,7 @@ call LINKEDLIST(atype, pos, lcsize, header, llist, nacell)
 call LINKEDLIST(atype, pos, nblcsize, nbheader, nbllist, nbnacell)
 
 call neighborlist(NMINCELL, atype, pos, inxn2)
-call GetNonbondingPairList(pos)
+call get_nonbonding_list(pos,rctap)
 
 !--- get atom type and global ids
 do i=1, NBUFFER
