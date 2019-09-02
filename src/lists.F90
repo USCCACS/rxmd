@@ -3,6 +3,20 @@ module lists_mod
   use mpi_mod
   implicit none
 
+  integer,parameter :: MAXLAYERS_NB=10
+  real(8) :: nblcsize(3)
+  integer :: nbcc(3), nbnmesh
+  integer,allocatable :: nbmesh(:,:)
+  real(8) :: nbrcut
+
+!<nbllist> Linked List for non-bonding interaction
+!<nbheader> header atom of linkedlist cell for non-bonding interaction
+!<nbnacell> Nr of atoms in a likedlist cell for non-bonding interaction
+  integer,allocatable :: nbllist(:), nbheader(:,:,:), nbnacell(:,:,:)
+
+!<nbplist> neighbor list of nonbonding interaction, non-bonding pair list
+  integer,allocatable :: nbplist(:,:)
+
 contains
 
 !----------------------------------------------------------------------------------------
@@ -157,8 +171,8 @@ end subroutine
 !----------------------------------------------------------------------
 subroutine get_nonbonding_list(pos, rcut)
 use base, only : it_timer
-use atoms, only : nbnmesh, nbheader, nbmesh, nbplist, &
-                  nbllist, nbnacell, nbcc
+!use atoms, only : nbnmesh, nbheader, nbmesh, nbplist, &
+!                  nbllist, nbnacell, nbcc
 !----------------------------------------------------------------------
 real(8),allocatable,intent(in) :: pos(:,:)
 real(8),intent(in) :: rcut
@@ -220,9 +234,9 @@ end subroutine
 subroutine get_mesh_for_nonbonding_list(rcut)
 ! setup 10[A] radius mesh to avoid visiting unecessary cells 
 !----------------------------------------------------------------
-use base, only : lata, latb, latc, vprocs, nbuffer
-use atoms, only : maxlayers_nb, nblcsize, &
-                  nbheader, nbllist, nbmesh, nbnacell, nbnmesh, nbcc
+use base, only : lata, latb, latc, vprocs, nbuffer, MAXNEIGHBS10
+!use atoms, only : maxlayers_nb, nblcsize, &
+!                  nbheader, nbllist, nbmesh, nbnacell, nbnmesh, nbcc
 use memory_allocator_mod
 implicit none
 
@@ -232,6 +246,8 @@ real(8) :: maxrcell
 real(8) :: latticePerNode(3), rr(3), dr2
 integer :: i,j,k, imesh(3), maximesh, ii(3), i1
 
+if(.not.allocated(nbplist)) &
+   call allocator(nbplist,0,MAXNEIGHBS10,1,NBUFFER)
 
 !--- initial estimate of LL cell dims
 nblcsize(1:3)=3d0
@@ -267,7 +283,8 @@ do k=-imesh(3), imesh(3)
    if(dr2 <= rcut**2) nbnmesh = nbnmesh + 1
 enddo; enddo; enddo
 
-call allocator(nbmesh,1,3,1,nbnmesh)
+if(.not.allocated(nbmesh)) &
+  call allocator(nbmesh,1,3,1,nbnmesh)
 
 nbmesh(:,:)=0
 nbnmesh=0
@@ -290,11 +307,16 @@ do k=-imesh(3), imesh(3)
    endif
 enddo; enddo; enddo
 
+if(.not.allocated(nbllist)) &
 call allocator(nbllist,1,NBUFFER)
+
+if(.not.allocated(nbheader)) &
 call allocator(nbheader, &
                 -MAXLAYERS_NB,nbcc(1)-1+MAXLAYERS_NB, &
                 -MAXLAYERS_NB,nbcc(2)-1+MAXLAYERS_NB, &
                 -MAXLAYERS_NB,nbcc(3)-1+MAXLAYERS_NB)
+
+if(.not.allocated(nbnacell)) &
 call allocator(nbnacell, &
                 -MAXLAYERS_NB,nbcc(1)-1+MAXLAYERS_NB, &
                 -MAXLAYERS_NB,nbcc(2)-1+MAXLAYERS_NB, &

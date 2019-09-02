@@ -15,7 +15,7 @@ module init
                   network_ctor, mean_stddev_loader, num_forcecomps, num_pairs, num_types, & 
                   mddriver_fnn, get_max_cutoff
 
-  use lists_mod, only: get_mesh_for_nonbonding_list 
+  use lists_mod, only: nbrcut, get_mesh_for_nonbonding_list 
 
   use fnnin_parser, only : fnn_param_ctor, set_feature_tables_fnn
 
@@ -23,6 +23,7 @@ module init
       get_cutoff_bondorder, set_potentialtables_reaxff, get_forcefield_params_reaxff
 
   use msd_mod, only : msd_data, msd_type_ctor
+  use stats_mod, only : stats, stats_type_ctor
 
 
 contains
@@ -207,6 +208,16 @@ if(msd_data%is_msd) then
                          size(msd_data%dat,dim=2), msd_data%unit_time
   endif
 endif
+
+!--- Structure analyzer constractor
+!NOTE: cutoff in stats, e.g. g(r), can be the min value of each lattice vectors,
+! but use rctap for ReaxFF since the nonboded list is used in the force/energy calcs.
+if(is_fnn) then
+  nbrcut = minval([lata,latb,latc])
+else
+  nbrcut = rctap
+endif
+stats = stats_type_ctor(nbrcut,atmname)
 
 !--- keep initial position
 if(isSpring .or. msd_data%is_msd) then

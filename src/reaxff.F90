@@ -7,6 +7,7 @@ use base, only : atmname, mass, NBUFFER, MAXNEIGHBS, it_timer, &
 use memory_allocator_mod
 use utils
 use msd_mod, only : msd_data
+use stats_mod, only : stats
 
 real(8),parameter :: MINBOSIG = 1d-3      !<minBOsig>: criterion to decide <rc> 
 real(8),parameter :: MINBO0 = 1d-4       !<minBO0>: cutoff bond order 
@@ -146,6 +147,9 @@ real(8) :: ctmp
 
 call charge_model_func(atype, pos, q)
 call force_model_func(natoms, atype, pos, f, q)
+
+if(stats%run_stats) call stats%measure(natoms,pos,atype)
+stop 'foo'
 
 !--- Enter Main MD loop 
 do nstep=0, num_mdsteps-1

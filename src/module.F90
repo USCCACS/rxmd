@@ -20,14 +20,13 @@ type :: mdbase_class
    class(force_field_class),pointer :: ff
 end type
 
-
 !integer :: NBUFFER=5000
 !integer,parameter :: MAXNEIGHBS=50  !<MAXNEIGHBS>: Max # of Ngbs one atom may have. 
 !integer,parameter :: MAXNEIGHBS10=200 !<MAXNEIGHBS>: Max # of Ngbs within the taper function cutoff. 
 
-
-integer :: NBUFFER=100000
-integer,parameter :: MAXNEIGHBS=50  !<MAXNEIGHBS>: Max # of Ngbs one atom may have. 
+integer :: NBUFFER=10000
+integer,parameter :: MAXNEIGHBS=50  ! Max # of Ngbs one atom may have. 
+integer,parameter :: MAXNEIGHBS10=1500 ! Max # of Ngbs for nonbonding pair. 
 
 !<NE_COPY>,<NE_MOVE>,<NE_CPBK> :: Number of Elements to COPY, MOVE atoms and CoPy BacK force. 
 integer,parameter :: MODE_COPY = 1, MODE_MOVE = 2, MODE_CPBK = 3
@@ -198,8 +197,6 @@ real(8),parameter :: MAXANGLE= 0.999999999999d0
 real(8),parameter :: MINANGLE=-0.999999999999d0
 real(8),parameter :: NSMALL = 1.d-10
 
-integer,parameter :: MAXLAYERS_NB=10
-integer,parameter :: MAXNEIGHBS10=1500 !<MAXNEIGHBS>: Max # of Ngbs within 10[A]. 
 
 !--- For array size statistics
 !  1-NATOMS, 2-nbrlist, 3-nbrlist for qeq, 4-NBUFFER for move, 5-NBUFFER for copy
@@ -212,12 +209,13 @@ integer,allocatable :: maxas(:,:)
 !  7-Ecoa,  8-Etors, 9-Econj, 10-Ehbond, 11-Evdwaals, 12-Ecoulomb 13-Echarge
 real(8) :: PE(13), GPE(13)
 
-real(8) :: nblcsize(3)
-integer :: nbcc(3)
+!integer,parameter :: MAXLAYERS_NB=10
+!real(8) :: nblcsize(3)
+!integer :: nbcc(3), nbnmesh
+!integer,allocatable :: nbmesh(:,:)
 
-integer :: nmesh, nbnmesh
-integer,allocatable :: mesh(:,:), nbmesh(:,:)
-
+integer :: nmesh 
+integer,allocatable :: mesh(:,:)
 
 !--- QEq variables. 
 !<isQEq> flag to run QEq routine: 0-No QEq, 1-CG, 2-Extended Lagrangian
@@ -238,16 +236,15 @@ real(8) :: UDR, UDRi
 logical :: isLG=.false.
 logical :: isEfield=.false.
 
-!<nbllist> Linked List for non-bonding interaction
-!<nbheader> header atom of linkedlist cell for non-bonding interaction
-!<nbnacell> Nr of atoms in a likedlist cell for non-bonding interaction
-integer,allocatable :: nbllist(:), nbheader(:,:,:), nbnacell(:,:,:)
+!!<nbllist> Linked List for non-bonding interaction
+!!<nbheader> header atom of linkedlist cell for non-bonding interaction
+!!<nbnacell> Nr of atoms in a likedlist cell for non-bonding interaction
+!integer,allocatable :: nbllist(:), nbheader(:,:,:), nbnacell(:,:,:)
+!!<nbplist> neighbor list of nonbonding interaction, non-bonding pair list
+!integer,allocatable :: nbplist(:,:)
 
 !<nbrindx> neighbor index
 integer,allocatable :: nbrindx(:,:)
-
-!<nbplist> neighbor list of nonbonding interaction, non-bonding pair list
-integer,allocatable :: nbplist(:,:)
 
 !--- coefficient of bonding energy derivative 
 real(8),allocatable :: ccbnd(:), cdbnd(:)
@@ -315,7 +312,7 @@ implicit none
 
 !--- extra lists for ReaxFF 
 call allocator(nbrindx,1,NBUFFER,1,MAXNEIGHBS)
-call allocator(nbplist,0,MAXNEIGHBS10,1,NBUFFER)
+!call allocator(nbplist,0,MAXNEIGHBS10,1,NBUFFER)
 
 !--- Bond Order Prime and deriv terms:
 call allocator(dln_BOp,1,3,1,NBUFFER,1,MAXNEIGHBS)
