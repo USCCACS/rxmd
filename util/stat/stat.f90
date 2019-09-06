@@ -4,6 +4,7 @@ module stat_mod
   real(8),parameter :: pi = 4.d0*datan(1.d0)
   integer,parameter :: NTABLES = 2000
   real(8),parameter :: RCUT = 40d0, DRI = NTABLES/RCUT
+  !real(8),parameter :: RCUT = 15d0, DRI = NTABLES/RCUT
   real(8),parameter :: QCUT = 10d0, DQ = QCUT/NTABLES
 
   type NSD_type ! Neutron Scattering Data type
@@ -91,51 +92,58 @@ contains
   subroutine save_analysis_results(this) 
      class(analysis_context) :: this
      integer :: iunit,ity,jty,k,kk
-     real(8) :: dr, rho, dqk, Snq, Snq_denom, prefactor, prefactor2
+     real(8) :: dr, rho, dqk, Snq, Snq_denom, Gnr, Gnr_denom, prefactor, prefactor2
 
      ! get the number density, rho
      rho = this%num_atoms/this%volume
 
      open(newunit=iunit,file='gr.dat',form='formatted')
 
-     !print'(a $)', 'distance'
-     write(unit=iunit,fmt='(a $)') 'distance'
+     write(unit=iunit,fmt='(a $)') ' distance'
      do ity=1,size(this%elems)
      do jty=1,size(this%elems)
         !print'(a5,i1,a1,i1 $)',',    ',ity,'-',jty
         write(unit=iunit,fmt='(a5,a5 $)') & 
-           ',    ',this%elems(ity)%str//'-'//this%elems(jty)%str
+           '     ',this%elems(ity)%str//'-'//this%elems(jty)%str
      enddo; enddo
-     !print*
-     write(unit=iunit,fmt=*)
+     write(unit=iunit,fmt='(a)') '  Gnr'
+
+     Gnr_denom = sum(this%NSD(:)%length * this%concentration(:))
+     Gnr_denom = Gnr_denom**2
 
      do k=1,size(this%gr,dim=3)
-        !print'(f10.5 $)', k/DRI
+
         dr = k/DRI
         prefactor = 4.d0*pi*dr*dr*rho/DRI
         write(unit=iunit,fmt='(f12.5 $)') dr
+
+        Gnr = 0.d0
         do ity=1,size(this%elems)
         do jty=1,size(this%elems)
-          !print'(f10.1,3x $)', this%gr(ity,jty,k)
+
           prefactor2 = this%concentration(jty) * this%num_atoms_per_type(ity) * this%num_sample_frames
           this%gr(ity,jty,k) = this%gr(ity,jty,k)/(prefactor*prefactor2)
           write(iunit, fmt='(f12.5,3x $)') this%gr(ity,jty,k)
+
+          Gnr = Gnr + this%gr(ity,jty,k) * &
+                      this%concentration(ity) * this%concentration(jty) * & 
+                      this%NSD(ity)%length * this%NSD(jty)%length
         enddo; enddo
-        !print*
-        write(unit=iunit,fmt=*)
+
+        write(iunit, fmt='(f12.5)') Gnr/Gnr_denom
      enddo
 
      close(iunit)
 
 
      open(newunit=iunit,file='sq.dat',form='formatted')
-     write(unit=iunit,fmt='(a $)') 'wave_vector '
+     write(unit=iunit,fmt='(a $)') ' wave_number '
      do ity=1,size(this%elems)
      do jty=1,size(this%elems)
         write(unit=iunit,fmt='(a5,a5 $)') & 
-           ',    ',this%elems(ity)%str//'-'//this%elems(jty)%str
+           '     ',this%elems(ity)%str//'-'//this%elems(jty)%str
      enddo; enddo
-     write(unit=iunit,fmt='(a)') ', Snq'
+     write(unit=iunit,fmt='(a)') '  Snq'
 
      ! get the denominator of Sn(q) 
      Snq_denom = sum(this%NSD(:)%length * this%concentration(:))
