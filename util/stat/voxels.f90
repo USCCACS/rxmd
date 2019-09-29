@@ -9,7 +9,7 @@ module voxels_mod
     type(string_array),allocatable :: elems(:)
     integer :: num_atoms
     real(8),allocatable :: x(:),y(:),z(:),q(:)
-    integer,allocatable :: itype(:)
+    integer,allocatable :: id(:), itype(:)
   end type
 
 !--- global vars to keep negative indices of type(voxels)
@@ -20,6 +20,7 @@ contains
 
 !-----------------------------------------------------------------------------------------
   subroutine get_voxel_params_from_mdframe(oneframe, num_cells, cell_size)
+!-----------------------------------------------------------------------------------------
 
     type(mdframe),intent(in) :: oneframe
     integer,intent(in out) :: num_cells(3)
@@ -135,17 +136,20 @@ contains
   end subroutine
 
 !-----------------------------------------------------------------------------------------
-  subroutine compute_interatomic_distance(ac, v1, v2)
+  subroutine compute_interatomic_distance(nbrlist, v1, v2)
 !-----------------------------------------------------------------------------------------
-    type(analysis_context),intent(in out) :: ac
+    type(nbrlist_type),allocatable :: nbrlist(:)
     type(voxel),intent(in) :: v1, v2
-    integer :: i,j,k,n, it,jt
-    real(8),allocatable :: x(:),y(:),z(:),r(:), fx(:),fy(:),fz(:)
+    integer :: i,j,k,n, it,jt, id
+    real(8) :: rr(3)
+    real(8),allocatable :: x(:),y(:),z(:),r(:)
     integer,allocatable :: ir(:)
     logical,allocatable :: l2b(:),l3b(:)
 
+    type(base_atom_type) :: atom
+
     n = v2%num_atoms
-    allocate(l2b(n), fx(n), fy(n), fz(n), ir(n))
+    allocate(l2b(n))
 
     do i=1, v1%num_atoms
        x = v2%x - v1%x(i)
@@ -159,24 +163,20 @@ contains
 
        where(0.d0 < r .and. r < rcut) 
           l2b = .true.
-          fx = x/r; fy = y/r; fz = z/r
        elsewhere
           l2b = .false.
-          fx = 0.d0; fy = 0.d0; fz = 0.d0
        end where
 
-       !where(0.d0 < r .and. r < rcut) 
-       !   l3b = .true.
-       !elsewhere
-       !   l3b = .false.
-       !end where
-
+       id = v1%id(i)
        do j=1, size(l2b)
+
           if(l2b(j)) then
-             it = v1%itype(i)
-             jt = v2%itype(j)
-             !print'(2i6,2i3,2f8.3,i6)',i,j, it,jt, r(j),rcut,ir(j)
-             ac%gr(it,jt,ir(j))=ac%gr(it,jt,ir(j))+1.d0
+             atom = base_atom_type( pos=[v2%x(j),v2%y(j),v2%z(j)], &
+                                    itype=v2%itype(j), rr=r(j), ir=ir(j), id=v2%id(j) )
+
+             nbrlist(id)%counter = nbrlist(id)%counter + 1
+             nbrlist(id)%nbrs(nbrlist(id)%counter) = atom
+
           endif
        enddo
 
@@ -229,7 +229,8 @@ contains
        c(i,j,k)%filename = frame%filename
 
        c(i,j,k)%num_atoms=0 
-       allocate(c(i,j,k)%x(0), c(i,j,k)%y(0), c(i,j,k)%z(0), c(i,j,k)%q(0), c(i,j,k)%elems(0), c(i,j,k)%itype(0))
+       allocate(c(i,j,k)%x(0), c(i,j,k)%y(0), c(i,j,k)%z(0), c(i,j,k)%q(0), c(i,j,k)%elems(0))
+       allocate(c(i,j,k)%id(0), c(i,j,k)%itype(0))
     enddo; enddo; enddo
 
 
@@ -246,6 +247,7 @@ contains
          cc%q = [cc%q,frame%q(i)]
          cc%elems = [cc%elems,frame%elems(i)]
          cc%itype = [cc%itype,get_index(lookup_elems, frame%elems(i)%str)]
+         cc%id = [cc%id,i]
          !print'(i6,3i3,3x,50a)',i,ir(1:3),cc%elems
          !print'(i6,3i3,3x,50i3)',i,ir(1:3),cc%itype
        end associate
@@ -261,9 +263,11 @@ contains
   end function
 
 !-----------------------------------------------------------------------------------------
-  function get_mdframe_from_xyzfile(xyzpath) result(c)
+  function get_mdframe_from_xyzfile(xyzpath, ac) result(c)
 !-----------------------------------------------------------------------------------------
      type(mdframe) :: c
+     type(analysis_context),optional,intent(in out) :: ac
+
 
      character(len=*),intent(in) :: xyzpath
      character(len=3) :: cbuf
@@ -278,16 +282,20 @@ contains
      read(unit=iunit,fmt=*) c%lattice(1:6)
 
      allocate(c%pos(c%num_atoms,3),c%v(c%num_atoms,3),c%f(c%num_atoms,3))
-     allocate(c%elems(c%num_atoms),c%q(c%num_atoms))
+     allocate(c%elems(c%num_atoms),c%q(c%num_atoms), c%itype(c%num_atoms))
      
      !print'(a,i6,6f8.3)',xyzpath,c%num_atoms,c%lattice(1:6)
      do i=1, c%num_atoms
         read(unit=iunit,fmt=*) cbuf, c%pos(i,1:3)
         c%elems(i)%str=trim(adjustl(cbuf))
-        !print*,c%elem(i), c%pos(i,1:3)
      enddo
-
      close(unit=iunit)
+
+     if(present(ac)) then
+       do i=1, c%num_atoms
+          c%itype(i) = get_index(ac%elems, c%elems(i)%str)
+       enddo
+     endif
   end function
 
 !-----------------------------------------------------------------------------------------
