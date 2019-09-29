@@ -2,7 +2,7 @@ module velocity_modifiers_mod
 
   use mpi_mod
   use utils, only : UTEMP0, UTEMP, matinv
-  use base, only : NATOMS, GNATOMS, mass, treq, KE, GKE, myid, ierr, dthm, hmas
+  use base, only : NATOMS, GNATOMS, mass, treq, KE, GKE, myid, ierr, dthm, hmas, atmname
 
 contains
 
@@ -299,35 +299,75 @@ real(8),allocatable,intent(in out):: v(:,:)
 real(8),intent(in) :: scaling_factor
 
 integer :: i,ity
-real(8) :: Ekinetic, kin, ctmp
+real(8) :: kin 
+integer :: Nsamples(size(atmname))
+real(8) :: Ekinetic(0:size(atmname)), ctmp(0:size(atmname))
 
-Ekinetic = 0.d0
+!--- get element-wise temperature first. 
+Ekinetic = 0.d0; Nsamples=0
 do i=1, NATOMS
    ity = nint(atype(i))
    kin = hmas(ity)*sum(v(i,1:3)*v(i,1:3))
-   ctmp = sqrt( (kin*UTEMP)/(treq*UTEMP0) )
-
-   if(ctmp>scaling_factor) v(i,1:3)=v(i,1:3)/scaling_factor 
-
-   ! compute system temperature after the scaling check above. 
-   Ekinetic = Ekinetic + hmas(ity)*sum(v(i,1:3)*v(i,1:3))
+   Ekinetic(ity) = Ekinetic(ity) + hmas(ity)*sum(v(i,1:3)*v(i,1:3))
+   Nsamples(ity) = Nsamples(ity) + 1
 enddo
 
-call MPI_ALLREDUCE(MPI_IN_PLACE, Ekinetic, 1, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_WORLD, ierr)
-Ekinetic = Ekinetic/GNATOMS
+call MPI_ALLREDUCE(MPI_IN_PLACE, Ekinetic, size(Ekinetic), &
+                   MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_WORLD, ierr)
+call MPI_ALLREDUCE(MPI_IN_PLACE, Nsamples, size(Nsamples), &
+                   MPI_INTEGER, MPI_SUM, MPI_COMM_WORLD, ierr)
 
-ctmp = sqrt( (treq*UTEMP0)/(Ekinetic*UTEMP) )
-if(myid==0) print'(a,3f10.3)','treq,Ekinetic,ctmp: ', (treq*UTEMP0),(Ekinetic*UTEMP),ctmp
+!--- get element-wise scaling factor. 
+do ity = 1, size(atmname)
+  if(Nsamples(ity)>0) then
+     Ekinetic(ity) = Ekinetic(ity)/Nsamples(ity)
+     ctmp(ity) = sqrt( (treq*UTEMP0)/(Ekinetic(ity)*UTEMP) )
+  else
+     ctmp(ity) = -1.d0
+  endif
+enddo
+
+!--- adjust each atomic velocity & get system temperature after the adjustment.
 do i=1, NATOMS
-   v(i,1:3)=v(i,1:3)*ctmp
+   ity = nint(atype(i))
+   Ekinetic(0) = hmas(ity)*sum(v(i,1:3)*v(i,1:3))
+   ctmp(0) = sqrt( (Ekinetic(0)*UTEMP)/(treq*UTEMP0) )
+
+   if(ctmp(0)>scaling_factor) &
+      v(i,1:3) = v(i,1:3)*sqrt(0.5d0*(scaling_factor+1.d0))/ctmp(0)
+
 enddo
 
 call linear_momentum(atype, v)
 
+Ekinetic = 0.d0
+do i=1, NATOMS
+   ity = nint(atype(i))
+   Ekinetic(ity) = Ekinetic(ity) + hmas(ity)*sum(v(i,1:3)*v(i,1:3))
+enddo
+
+call MPI_ALLREDUCE(MPI_IN_PLACE, Ekinetic, size(Ekinetic), &
+                   MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_WORLD, ierr)
+
+!--- get system temperature and its difference from treq
+Ekinetic(0)=sum(Ekinetic(1:size(atmname)))/GNATOMS
+ctmp(0) = sqrt((Ekinetic(0)*UTEMP)/(treq*UTEMP0))
+v(1:natoms,1:3) = v(1:natoms,1:3)/ctmp(0)
+
+if(myid==0) then
+  write(6,fmt='(a,2f10.3,3x)',advance='no') &
+     'T,ctmp : ', Ekinetic(0)*UTEMP, ctmp(0)
+
+  do ity=1, size(atmname)
+     if(Nsamples(ity)>0) &
+        write(6,fmt='(i1,a2,2f10.3,2x)',advance='no') & 
+        ity,'-',Ekinetic(ity)*UTEMP/Nsamples(ity),ctmp(ity)
+  enddo
+  write(6,fmt=*)
+endif
+
 return
 end
-
-
 
 !------------------------------------------------------------------------------
 subroutine vkick(dtf, atype, v, f)

@@ -1,7 +1,7 @@
 ### SiO2 system ###
-## model data: element name, AMU, scaling factor, network dimensions
-model  O    15.99   10.0   352 512 1024 512 1
-model  Si   28.08   10.0   352 512 1024 512 1
+## model data: element name, AMU, scaling factor, hidden layer dimensions 
+model  O    15.99   10.0   512 1024 512
+model  Si   28.08   10.0   512 1024 512
 
 # radial feature parameters; rc, rdamp, mu, eta
 rad Si Si

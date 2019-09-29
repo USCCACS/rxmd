@@ -494,6 +494,7 @@ nmeta=4+nprocs+1
 allocate(idata(nmeta))
 metaDataSize = 4*nmeta + 8*6
 
+if(myid==0) write(6,'(2a)') 'INFO: Opening file in ReadBIN(): ', trim(fileName)
 call MPI_File_Open(MPI_COMM_WORLD,trim(fileName),MPI_MODE_RDONLY,MPI_INFO_NULL,fh,ierr)
 
 if(ierr > 0) then

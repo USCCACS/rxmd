@@ -288,19 +288,24 @@ end subroutine
     type(model_params),allocatable,intent(in out) :: models(:)
     type(model_params) :: mbuf
 
-    if (getstr(linein, token) < 0) stop 'erro while reading element name'
+    if (getstr(linein, token) < 0) stop 'error while reading element name'
     mbuf%element = trim(adjustl(token))
-    if (getstr(linein, token) < 0) stop 'erro while reading element mass'
+    if (getstr(linein, token) < 0) stop 'error while reading element mass'
     read(token, *) mbuf%mass
-    if (getstr(linein, token) < 0) stop 'erro while reading scaling factor'
+    if (getstr(linein, token) < 0) stop 'error while reading scaling factor'
     read(token, *) mbuf%scaling_factor
 
     ! allocate zero-sized array
     if(.not.allocated(mbuf%layersize)) allocate(mbuf%layersize(0))
+
+    ! reserve the input layer size for feature vector and output layer size with -1.
+    ! they will be updated in fnn_param_ctor() after processing all parameters.
+    mbuf%layersize= [mbuf%layersize, -1]
     do while( getstr(linein, token) > 0 )
        read(token, *) ibuf
        mbuf%layersize= [mbuf%layersize, ibuf]
     enddo
+    mbuf%layersize= [mbuf%layersize, -1]
 
     ! allocate zero-sized array
     if(.not.allocated(models)) allocate(models(0)) 
@@ -436,6 +441,11 @@ end subroutine
 
          !print'(a,5i6)','ia,size(rad),size(ang),m%feature_ptr(1:2): ', &
          !        ia,size(m%feature_ptr_rad),size(m%feature_ptr_ang),m%num_features(1:2)
+
+         ! update input layer size with the total number of features
+         m%layersize(1) = m%num_features(1) + m%num_features(2)
+         ! update output layer size with 1 
+         m%layersize(size(m%layersize)) = 1
        end associate
 
     enddo
@@ -711,6 +721,12 @@ integer,intent(in) :: num_mdsteps
 real(8) :: ctmp,cpu0,cpu1,cpu2,comp=0.d0
 
 integer :: i,ity
+
+if(mdmode==0) then
+  call gaussian_dist_velocity(atype, v)
+  call WriteBIN(atype, pos, v, q, GetFileNameBase(DataDir,-1))
+  return
+endif
 
 call get_force_fnn(mdbase%ff, natoms, atype, pos, f, q)
 
@@ -1105,7 +1121,7 @@ do i=1, num_layers-1
     call MPI_BCAST(net%layers(i)%b, size(net%layers(i)%b), MPI_FLOAT, 0, MPI_COMM_WORLD, ierr) ! TODO: support only MPI_FLOAT for now
     close(fileunit)
   else
-    if(myid==0) then
+    if(present(verbose) .and. verbose .and. myid==0) then
       print'(a)',repeat('-',80)
       print'(a)', 'ERROR: '//filename_b//' does not exist. continue with zero-valued bias.' 
       print'(a)',repeat('-',80)
@@ -1122,12 +1138,13 @@ do i=1, num_layers-1
      close(fileunit)
   else
      
-    if(myid==0) then
+    if(present(verbose) .and. verbose .and. myid==0) then
       print'(a)',repeat('-',80)
       print'(a)', 'ERROR: '//filename_w//' does not exist. continue with zero-valued weight.' 
       print'(a)',repeat('-',80)
     endif
     net%layers(i)%w=0.0
+
   endif
 
   if(present(verbose) .and. verbose) &

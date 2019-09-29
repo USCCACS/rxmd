@@ -26,7 +26,7 @@ end type
 
 integer :: NBUFFER=10000
 integer,parameter :: MAXNEIGHBS=50  ! Max # of Ngbs one atom may have. 
-integer,parameter :: MAXNEIGHBS10=1500 ! Max # of Ngbs for nonbonding pair. 
+integer,parameter :: MAXNEIGHBS10=100 ! Max # of Ngbs for nonbonding pair. 
 
 !<NE_COPY>,<NE_MOVE>,<NE_CPBK> :: Number of Elements to COPY, MOVE atoms and CoPy BacK force. 
 integer,parameter :: MODE_COPY = 1, MODE_MOVE = 2, MODE_CPBK = 3
