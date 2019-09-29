@@ -29,7 +29,7 @@ fnn.o : module.o comm.o lists.o fileio.o
 
 cmdline.o : utils.o module.o memory.o
 msd.o : utils.o module.o
-stats.o: utils.o lists.o
+stats.o: utils.o lists.o module.o
 reaxff.o : cmdline.o utils.o fileio.o comm.o velocity.o msd.o stats.o
 
 bo.o : reaxff.o

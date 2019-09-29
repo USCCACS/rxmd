@@ -6,6 +6,7 @@ module fnnin_parser
   use velocity_modifiers_mod, only : vkick, linear_momentum, &
                                      scale_to_target_temperature, &
                                      maximally_preserving_bd
+  use stats_mod, only : stats
 
   use iso_fortran_env, only: int32, int64, real32, real64 
 
@@ -722,6 +723,7 @@ real(8) :: ctmp,cpu0,cpu1,cpu2,comp=0.d0
 
 integer :: i,ity
 
+
 if(mdmode==0) then
   call gaussian_dist_velocity(atype, v)
   call WriteBIN(atype, pos, v, q, GetFileNameBase(DataDir,-1))
@@ -729,6 +731,7 @@ if(mdmode==0) then
 endif
 
 call get_force_fnn(mdbase%ff, natoms, atype, pos, f, q)
+call stats%measure(natoms,pos,atype)
 
 call cpu_time(cpu0)
 

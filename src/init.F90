@@ -210,14 +210,9 @@ if(msd_data%is_msd) then
 endif
 
 !--- Structure analyzer constractor
-!NOTE: cutoff in stats, e.g. g(r), can be the min value of each lattice vectors,
-! but use rctap for ReaxFF since the nonboded list is used in the force/energy calcs.
-if(is_fnn) then
-  nbrcut = minval([lata,latb,latc])
-else
-  nbrcut = rctap
-endif
-stats = stats_type_ctor(nbrcut,atmname)
+!NOTE: g(r) is computed upto maxrc 
+nbrcut = maxrc
+stats = stats_type_ctor(nbrcut, atmname, mdbox, natoms_per_type)
 
 !--- keep initial position
 if(isSpring .or. msd_data%is_msd) then
