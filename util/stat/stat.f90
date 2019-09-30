@@ -145,12 +145,17 @@ contains
 
      open(newunit=iunit,file='gr.dat',form='formatted')
 
+     ! g(r) header part
      write(unit=iunit,fmt='(a $)') ' distance'
-     do ity=1,size(this%elems)
+     do ity=1,size(this%elems); 
      do jty=1,size(this%elems)
-        !print'(a5,i1,a1,i1 $)',',    ',ity,'-',jty
-        write(unit=iunit,fmt='(a5,a5 $)') & 
-           '     ',this%elems(ity)%str//'-'//this%elems(jty)%str
+        write(unit=iunit,fmt='(a12, 1x)', advance='no') & 
+           this%elems(ity)%str//'-'//this%elems(jty)%str//'(gr)'
+     enddo; enddo
+     do ity=1,size(this%elems);
+     do jty=1,size(this%elems)
+        write(unit=iunit,fmt='(a12, 1x)', advance='no') & 
+           this%elems(ity)%str//'-'//this%elems(jty)%str//'(nr)'
      enddo; enddo
      write(unit=iunit,fmt='(a)') '  Gnr'
 
@@ -161,15 +166,26 @@ contains
 
         dr = k/DRI
         prefactor = 4.d0*pi*dr*dr*rho/DRI
-        write(unit=iunit,fmt='(f12.5 $)') dr
+        write(unit=iunit,fmt='(f12.5)',advance='no') dr
 
         Gnr = 0.d0
         do ity=1,size(this%elems)
         do jty=1,size(this%elems)
 
           prefactor2 = this%concentration(jty) * this%num_atoms_per_type(ity) * this%num_sample_frames
-          this%gr(ity,jty,k) = this%gr(ity,jty,k)/(prefactor*prefactor2)
-          write(iunit, fmt='(f12.5,3x $)') this%gr(ity,jty,k)
+          write(iunit, fmt='(f12.5,1x)',advance='no') this%gr(ity,jty,k)/(prefactor*prefactor2) 
+
+          Gnr = Gnr + this%gr(ity,jty,k) * &
+                      this%concentration(ity) * this%concentration(jty) * & 
+                      this%NSD(ity)%length * this%NSD(jty)%length
+        enddo; enddo
+
+        do ity=1,size(this%elems)
+        do jty=1,size(this%elems)
+          this%nr(ity,jty,k) = sum(this%gr(ity,jty,1:k))
+
+          write(iunit, fmt='(f12.5,1x)',advance='no') &
+                this%nr(ity,jty,k)/(this%num_atoms_per_type(ity)*this%num_sample_frames)
 
           Gnr = Gnr + this%gr(ity,jty,k) * &
                       this%concentration(ity) * this%concentration(jty) * & 
@@ -234,35 +250,29 @@ contains
 
      do ity=1,size(this%elems)
         open(newunit=iunit,file='ba-'//this%elems(ity)%str//'.dat',form='formatted')
-        write(unit=iunit,fmt='(a8)', advance='no') 'angle'
+        write(unit=iunit,fmt='(a8,1x)', advance='no') 'angle'
         do jty=1,size(this%elems)
         do kty=1,size(this%elems)
            do l=1,size(this%ba,dim=4)
              write(a1,'(i1)') l
-               write(unit=iunit,fmt='(a10,1x)',advance='no') & 
+               write(unit=iunit,fmt='(a12,1x)',advance='no') & 
                  this%elems(jty)%str//'-'//this%elems(ity)%str//'-'//this%elems(kty)%str//'_'//a1
            enddo
         enddo; enddo
         write(unit=iunit,fmt=*) 
 
         do k=1,size(this%ba,dim=5)
-           write(unit=iunit,fmt='(i8)', advance='no') k
+           write(unit=iunit,fmt='(i8,1x)', advance='no') k
            do jty=1,size(this%elems)
            do kty=1,size(this%elems)
-
               do l=1,size(this%ba,dim=4)
-                if(this%num_atoms_per_type(ity)>0) then
-                  if(l==1) then
-                    bavalue = this%ba(jty,ity,kty,l,k)
-                  else
-                    bavalue = this%ba(jty,ity,kty,l,k) - this%ba(jty,ity,kty,l-1,k)
-                  endif
-                  bavalue = bavalue/(this%num_atoms_per_type(ity) * this%num_sample_frames)
-                  write(unit=iunit,fmt='(f10.5)',advance='no') bavalue
-                     !this%ba(jty,ity,kty,l,k)/(this%num_atoms_per_type(ity) * this%num_sample_frames)
-                else
-                  write(unit=iunit,fmt='(f10.5)',advance='no') 0.d0
-                endif
+                 bavalue = sum(this%ba(jty,ity,kty,l,:))
+                 if(bavalue>0.d0) then
+                   write(unit=iunit,fmt='(es12.5,1x)',advance='no') &
+                     this%ba(jty,ity,kty,l,k)/(bavalue*this%num_atoms_per_type(ity)*this%num_sample_frames)
+                 else
+                   write(unit=iunit,fmt='(es12.5,1x)',advance='no') 0.d0
+                 endif
               enddo
 
            enddo; enddo
