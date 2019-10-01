@@ -15,7 +15,7 @@ module stat_mod
 
   ! neutron scattering length data are from 
   !  https://www.nist.gov/ncnr/neutron-scattering-lengths-list
-  type(NSD_type) :: NSD0(11)=[ NSD_type(name='Ge',length=8.185d-5), & 
+  type(NSD_type) :: NSD0(11)=[NSD_type(name='Ge',length=8.185d-5), & 
                               NSD_type(name='Se',length=7.970d-5), &
                               NSD_type(name='Sb',length=5.57d-5), &
                               NSD_type(name='Te',length=5.80d-5), & 
@@ -162,6 +162,14 @@ contains
      Gnr_denom = sum(this%NSD(:)%length * this%concentration(:))
      Gnr_denom = Gnr_denom**2
 
+     ! get coordination number, n(r)
+     do k=1,size(this%gr,dim=3)
+        do ity=1,size(this%elems)
+        do jty=1,size(this%elems)
+          this%nr(ity,jty,k) = sum(this%gr(ity,jty,1:k))/(this%num_atoms_per_type(ity)*this%num_sample_frames)
+        enddo; enddo
+     enddo
+
      do k=1,size(this%gr,dim=3)
 
         dr = k/DRI
@@ -173,7 +181,8 @@ contains
         do jty=1,size(this%elems)
 
           prefactor2 = this%concentration(jty) * this%num_atoms_per_type(ity) * this%num_sample_frames
-          write(iunit, fmt='(f12.5,1x)',advance='no') this%gr(ity,jty,k)/(prefactor*prefactor2) 
+          this%gr(ity,jty,k) = this%gr(ity,jty,k)/(prefactor*prefactor2)
+          write(iunit, fmt='(f12.5,1x)',advance='no') this%gr(ity,jty,k)
 
           Gnr = Gnr + this%gr(ity,jty,k) * &
                       this%concentration(ity) * this%concentration(jty) * & 
@@ -182,14 +191,7 @@ contains
 
         do ity=1,size(this%elems)
         do jty=1,size(this%elems)
-          this%nr(ity,jty,k) = sum(this%gr(ity,jty,1:k))
-
-          write(iunit, fmt='(f12.5,1x)',advance='no') &
-                this%nr(ity,jty,k)/(this%num_atoms_per_type(ity)*this%num_sample_frames)
-
-          Gnr = Gnr + this%gr(ity,jty,k) * &
-                      this%concentration(ity) * this%concentration(jty) * & 
-                      this%NSD(ity)%length * this%NSD(jty)%length
+          write(iunit, fmt='(f12.5,1x)',advance='no') this%nr(ity,jty,k)
         enddo; enddo
 
         write(iunit, fmt='(f12.5)') Gnr/Gnr_denom
