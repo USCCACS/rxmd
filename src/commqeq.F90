@@ -54,17 +54,19 @@ CONTAINS
 
 !--------------------------------------------------------------------------------------------------------------
 ! tag the atoms to be sent
-! @param dflag direction flag
-! @param dr ?
-! @param commflag tag array
 subroutine step_preparation_qeq(dflag, dr, commflag)
 implicit none
 !--------------------------------------------------------------------------------------------------------------
-integer,intent(in) :: dflag
-real(8),intent(in) :: dr(3)
-logical,intent(inout) :: commflag(NBUFFER)
+! direction flag
+integer, intent(in) :: dflag
+! the thickness of the skin from the surface
+real(8), intent(in) :: dr(3)
+! commflag tag array
+logical, intent(inout) :: commflag(NBUFFER)
 integer :: i
 do i=1, natom_resident_receive(cptridx(dflag))
+   ! check if an atom is within the skin
+   ! Ye: FIXME commflag should not be just flags, it should be the index of the filterred atoms
    commflag(i) = inBuffer_qeq(dflag,dr,pos(i,is_xyz(dflag)))
 enddo
 return
@@ -75,13 +77,17 @@ subroutine store_atoms_qeq(tn, dflag, imode)
 use atoms;
 !--------------------------------------------------------------------------------------------------------------
 implicit none
-integer,intent(IN) :: tn, dflag, imode
+! Ye: why not used
+integer,intent(IN) :: tn
+integer,intent(IN) :: dflag
+integer,intent(IN) :: imode
 integer :: n,ni,is,a,b,ioffset
 real(8) :: sft
 
 !--- reset the number of atoms to be sent
 ns=0
 !--- # of elements to be sent. should be more than enough. 
+! Ye: FIXME it seems computing the reserved space. probably more than required.
 ni = natom_resident_receive(cptridx(dflag))*ne
 !--- <sbuffer> will deallocated in store_atoms
 call CheckSizeThenReallocate_qeq(sbuffer,ni)
@@ -118,11 +124,7 @@ if( (na+nr)/ne > NBUFFER) then
     stop
 endif
 
-if(nr==0) then
-  natom_resident_receive(dflag) = natom_resident_receive(dflag-1)
-else
-  natom_resident_receive(dflag) = natom_resident_receive(dflag-1) + nr/ne
-end if
+natom_resident_receive(dflag) = natom_resident_receive(dflag-1) + nr/ne
 
 if (imode==MODE_QCOPY1) then
     do i=0, nr/ne-1
