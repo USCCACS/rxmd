@@ -1,6 +1,7 @@
 !--------------------------------------------------------------------------------------------------------------
 subroutine COPYATOMS_QEq(imode, dr, atype, pos, v, f, q)
-use atoms;
+use atoms
+!use atoms, only ne, target_node;
 !--------------------------------------------------------------------------------------------------------------
 implicit none
 
@@ -16,13 +17,18 @@ integer :: ni, ity
 
 integer :: ti,tj,tk,tti,ttj
 
-integer,parameter :: dinv(6)=(/2,1,4,3,6,5/)                   ! index of the 6 way communication
-integer,parameter :: cptridx(6)=(/0,0,2,2,4,4/)                ! number of atoms resident+cached in direction for communication  
-integer,parameter :: is_xyz(6)=(/1,1,2,2,3,3/)  !<- [xxyyzz]   !tells the direction in which the information needs to be send 
+! index of the 6 way communication
+integer, parameter :: dinv(6)=(/2,1,4,3,6,5/)
+! number of resident atoms after i-th receive operation. 0 refers the count before any communication
+integer :: natom_resident_receive(0:6)
+! index to the natom_resident_receive. Look up the number of resident atoms before i-th send operation.
+integer, parameter :: cptridx(6)=(/0,0,2,2,4,4/)
+! tells the direction in which the information needs to be send 
+integer, parameter :: is_xyz(6)=(/1,1,2,2,3,3/)  !<- [xxyyzz]
 
 !--- clear total # of copied atoms, sent atoms, recieved atoms
 na=0; ns=0; nr=0
-copyptr(0)=NATOMS
+natom_resident_receive(0)=NATOMS
 
 
 !--- set Nr of elements during this communication. 
@@ -30,14 +36,11 @@ if(imode==MODE_QCOPY1) ne=2
 if(imode==MODE_QCOPY2) ne=3
 
 do dflag=1, 6
+   ! the node number send to
    tn1 = target_node(dflag)
+   ! the node number receive from
    tn2 = target_node(dinv(dflag))
    ixyz = is_xyz(dflag)
-   if(imode==MODE_CPBK) then  ! communicate with neighbors in reversed order
-     tn1 = target_node(7-dinv(dflag)) ! <-[563412] 
-     tn2 = target_node(7-dflag) ! <-[654321]
-     ixyz = is_xyz(7-dflag)        ! <-[332211]
-   end if
 
    call step_preparation_qeq(dflag, dr, commflag)
    call store_atoms_qeq(tn1, dflag, imode)
@@ -50,6 +53,10 @@ return
 CONTAINS
 
 !--------------------------------------------------------------------------------------------------------------
+! tag the atoms to be sent
+! @param dflag direction flag
+! @param dr ?
+! @param commflag tag array
 subroutine step_preparation_qeq(dflag, dr, commflag)
 implicit none
 !--------------------------------------------------------------------------------------------------------------
@@ -57,7 +64,7 @@ integer,intent(in) :: dflag
 real(8),intent(in) :: dr(3)
 logical,intent(inout) :: commflag(NBUFFER)
 integer :: i
-do i=1, copyptr(cptridx(dflag))
+do i=1, natom_resident_receive(cptridx(dflag))
    commflag(i) = inBuffer_qeq(dflag,dr,pos(i,is_xyz(dflag)))
 enddo
 return
@@ -75,11 +82,11 @@ real(8) :: sft
 !--- reset the number of atoms to be sent
 ns=0
 !--- # of elements to be sent. should be more than enough. 
-ni = copyptr(cptridx(dflag))*ne
+ni = natom_resident_receive(cptridx(dflag))*ne
 !--- <sbuffer> will deallocated in store_atoms
 call CheckSizeThenReallocate_qeq(sbuffer,ni)
 
-do n=1,copyptr(cptridx(dflag))
+do n=1,natom_resident_receive(cptridx(dflag))
    if(commflag(n)) then
        if (imode==MODE_QCOPY1) then
            sbuffer(ns+1) = qs(n)
@@ -112,15 +119,15 @@ if( (na+nr)/ne > NBUFFER) then
 endif
 
 if(nr==0) then
-  copyptr(dflag) = copyptr(dflag-1)
+  natom_resident_receive(dflag) = natom_resident_receive(dflag-1)
 else
-  copyptr(dflag) = copyptr(dflag-1) + nr/ne
+  natom_resident_receive(dflag) = natom_resident_receive(dflag-1) + nr/ne
 end if
 
 if (imode==MODE_QCOPY1) then
     do i=0, nr/ne-1
        ine=i*ne
-       m = copyptr(dflag-1) + 1 + i
+       m = natom_resident_receive(dflag-1) + 1 + i
        qs(m) = rbuffer(ine+1)
        qt(m) = rbuffer(ine+2)
     end do
@@ -129,7 +136,7 @@ end if
 if (imode==MODE_QCOPY2) then
    do i=0, nr/ne-1
       ine=i*ne
-      m = copyptr(dflag-1) + 1 + i
+      m = natom_resident_receive(dflag-1) + 1 + i
       hs(m) = rbuffer(ine+1)
       ht(m) = rbuffer(ine+2)
       q(m)  = rbuffer(ine+3)
@@ -210,12 +217,13 @@ endif
 end subroutine
 
 !--------------------------------------------------------------------------------------------------------------
+! check if an atom is with the box to be communicated
 function inBuffer_qeq(dflag, dr, rr) result(isInside)
-use atoms
+use atoms, only: lbox
 !--------------------------------------------------------------------------------------------------------------
 implicit none
-integer,intent(IN) :: dflag
-real(8),intent(IN) :: dr(3), rr
+integer, intent(IN) :: dflag
+real(8), intent(IN) :: dr(3), rr
 logical :: isInside
 
 select case(dflag)
