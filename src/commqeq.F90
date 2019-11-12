@@ -16,9 +16,9 @@ integer :: ni, ity
 
 integer :: ti,tj,tk,tti,ttj
 
-integer,parameter :: dinv(6)=(/2,1,4,3,6,5/)
-integer,parameter :: cptridx(6)=(/0,0,2,2,4,4/)
-integer,parameter :: is_xyz(6)=(/1,1,2,2,3,3/)  !<- [xxyyzz]
+integer,parameter :: dinv(6)=(/2,1,4,3,6,5/)                   ! index of the 6 way communication
+integer,parameter :: cptridx(6)=(/0,0,2,2,4,4/)                ! number of atoms resident+cached in direction for communication  
+integer,parameter :: is_xyz(6)=(/1,1,2,2,3,3/)  !<- [xxyyzz]   !tells the direction in which the information needs to be send 
 
 !--- clear total # of copied atoms, sent atoms, recieved atoms
 na=0; ns=0; nr=0
