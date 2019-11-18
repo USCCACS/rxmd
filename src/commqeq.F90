@@ -19,21 +19,22 @@ integer :: ti,tj,tk,tti,ttj
 
 ! index of the 6 way communication
 integer, parameter :: dinv(6)=(/2,1,4,3,6,5/)
-! number of resident atoms after i-th receive operation. 0 refers the count before any communication
-integer :: natom_resident_receive(0:6)
-! index to the natom_resident_receive. Look up the number of resident atoms before i-th send operation.
+! index to the copyptr. Look up the number of resident atoms before i-th send operation.
 integer, parameter :: cptridx(6)=(/0,0,2,2,4,4/)
 ! tells the direction in which the information needs to be send 
 integer, parameter :: is_xyz(6)=(/1,1,2,2,3,3/)  !<- [xxyyzz]
 
 !--- clear total # of copied atoms, sent atoms, recieved atoms
 na=0; ns=0; nr=0
-natom_resident_receive(0)=NATOMS
+copyptr(0)=NATOMS
 
 
 !--- set Nr of elements during this communication. 
 if(imode==MODE_QCOPY1) ne=2
 if(imode==MODE_QCOPY2) ne=3
+
+!--- Get the normalized local coordinate will be used through this function
+call xu2xs_inplace(max(copyptr(6),NATOMS),pos)
 
 do dflag=1, 6
    ! the node number send to
@@ -48,6 +49,8 @@ do dflag=1, 6
    call append_atoms_qeq(dflag, imode)
 enddo
 
+!--- by here, we got new atom positions in the normalized coordinate, need to update real coordinates.
+call xs2xu_inplace(copyptr(6),pos)
 return
 
 CONTAINS
@@ -64,7 +67,7 @@ real(8), intent(in) :: dr(3)
 ! commflag tag array
 logical, intent(inout) :: commflag(NBUFFER)
 integer :: i
-do i=1, natom_resident_receive(cptridx(dflag))
+do i=1, copyptr(cptridx(dflag))
    ! check if an atom is within the skin
    ! Ye: FIXME commflag should not be just flags, it should be the index of the filterred atoms
    commflag(i) = inBuffer_qeq(dflag,dr,pos(i,is_xyz(dflag)))
@@ -88,11 +91,11 @@ real(8) :: sft
 ns=0
 !--- # of elements to be sent. should be more than enough. 
 ! Ye: FIXME it seems computing the reserved space. probably more than required.
-ni = natom_resident_receive(cptridx(dflag))*ne
+ni = copyptr(cptridx(dflag))*ne
 !--- <sbuffer> will deallocated in store_atoms
 call CheckSizeThenReallocate_qeq(sbuffer,ni)
 
-do n=1,natom_resident_receive(cptridx(dflag))
+do n=1,copyptr(cptridx(dflag))
    if(commflag(n)) then
        if (imode==MODE_QCOPY1) then
            sbuffer(ns+1) = qs(n)
@@ -124,12 +127,12 @@ if( (na+nr)/ne > NBUFFER) then
     stop
 endif
 
-natom_resident_receive(dflag) = natom_resident_receive(dflag-1) + nr/ne
+copyptr(dflag) = copyptr(dflag-1) + nr/ne
 
 if (imode==MODE_QCOPY1) then
     do i=0, nr/ne-1
        ine=i*ne
-       m = natom_resident_receive(dflag-1) + 1 + i
+       m = copyptr(dflag-1) + 1 + i
        qs(m) = rbuffer(ine+1)
        qt(m) = rbuffer(ine+2)
     end do
@@ -138,7 +141,7 @@ end if
 if (imode==MODE_QCOPY2) then
    do i=0, nr/ne-1
       ine=i*ne
-      m = natom_resident_receive(dflag-1) + 1 + i
+      m = copyptr(dflag-1) + 1 + i
       hs(m) = rbuffer(ine+1)
       ht(m) = rbuffer(ine+2)
       q(m)  = rbuffer(ine+3)
