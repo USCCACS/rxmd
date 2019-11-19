@@ -45,7 +45,7 @@ do dflag=1, 6
 
    call step_preparation_qeq(dflag, dr, commflag)
    call store_atoms_qeq(tn1, dflag, imode)
-   call send_recv_qeq(tn1, tn2, myparity(ixyz))
+   call i_send_recv_qeq(tn1, tn2, myparity(ixyz),dflag)
    call append_atoms_qeq(dflag, imode)
 enddo
 
@@ -154,13 +154,20 @@ na=na+nr
 end subroutine append_atoms_qeq
 
 !--------------------------------------------------------------------------------------------------------------
-subroutine  send_recv_qeq(tn1, tn2, mypar)
+subroutine  i_send_recv_qeq(tn1, tn2, mypar,dflag)
 use atoms
 !--------------------------------------------------------------------------------------------------------------
 implicit none
-integer,intent(IN) ::tn1, tn2, mypar
+integer,intent(IN) ::tn1, tn2, mypar, dflag
 integer :: recv_stat(MPI_STATUS_SIZE)
 real(8) :: recv_size
+integer :: send_request,recv_request
+
+!--- if myid is the same of target-node ID, don't use MPI call.
+!--- Just copy <sbuffer> to <rbuffer>. Because <send_recv()> will not be used,
+!--- <nr> has to be updated here for <append_atoms()>.
+
+ns = ns_atoms(dflag)*ne
 
 if(myid==tn1) then
    if(ns>0) then
@@ -174,51 +181,24 @@ if(myid==tn1) then
    return
 endif
 
-if (mypar == 0) then
+call system_clock(ti,tk)
 
-     ! the number of elements per data packet has to be greater than 1, for
-     ! example NE_COPY = 10.
-     ! if ns == 0, send one double to tell remote rank that there will be no
-     ! atom data to be sent. 
-     if (ns > 0) then
-       call MPI_SEND(sbuffer, ns, MPI_DOUBLE_PRECISION, tn1, 10, MPI_COMM_WORLD,ierr)
-     else
-       call MPI_SEND(1, 1, MPI_DOUBLE_PRECISION, tn1, 10, MPI_COMM_WORLD, ierr)
-     endif
+if (ns >0) then
+    call MPI_Isend(sbuffer,ns,MPI_DOUBLE_PRECISION,tn1,10,MPI_COMM_WORLD,send_request,ierr)
+else
+    call MPI_Isend(1,1,MPI_DOUBLE_PRECISION,tn1,10,MPI_COMM_WORLD,send_request,ierr)
+end if
 
-     call MPI_Probe(tn2, 11, MPI_COMM_WORLD, recv_stat, ierr)
-     call MPI_Get_count(recv_stat, MPI_DOUBLE_PRECISION, nr, ierr)
+nr = nr_atoms(dflag)*ne
+call CheckSizeThenReallocate_qeq(rbuffer,nr)
+call MPI_Irecv(rbuffer,nr,MPI_DOUBLE_PRECISION,tn2,10,MPI_COMM_WORLD,recv_request,ierr)
+if(nr==1) nr=0
 
-     call CheckSizeThenReallocate_qeq(rbuffer,nr)
+call MPI_Wait(recv_request,recv_stat,ierr)
 
-     call MPI_RECV(rbuffer, nr, MPI_DOUBLE_PRECISION, tn2, 11, MPI_COMM_WORLD,recv_stat, ierr)
+call system_clock(tj,tk)
+it_timer(25)=it_timer(25)+(tj-ti)
 
-     ! the number of elements per data packet has to be greater than 1, for
-     ! example NE_COPY = 10.
-     ! nr == 1 means no atom data to be received. 
-     if(nr==1) nr=0
-
-elseif (mypar == 1) then
-
-     call MPI_Probe(tn2, 10, MPI_COMM_WORLD, recv_stat, ierr)
-     call MPI_Get_count(recv_stat, MPI_DOUBLE_PRECISION, nr, ierr)
-
-     call CheckSizeThenReallocate_qeq(rbuffer,nr)
-
-     call MPI_RECV(rbuffer, nr, MPI_DOUBLE_PRECISION, tn2, 10, MPI_COMM_WORLD, recv_stat, ierr)
-
-     ! the number of elements per data packet has to be greater than 1, for
-     ! example NE_COPY = 10.
-     ! nr == 1 means no atom data to be received. 
-     if(nr==1) nr=0
-
-     if (ns > 0) then
-        call MPI_SEND(sbuffer, ns, MPI_DOUBLE_PRECISION, tn1, 11, MPI_COMM_WORLD, ierr)
-     else
-        call MPI_SEND(1, 1, MPI_DOUBLE_PRECISION, tn1, 11, MPI_COMM_WORLD, ierr)
-     endif
-
-endif
 end subroutine
 
 !--------------------------------------------------------------------------------------------------------------

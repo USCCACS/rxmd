@@ -33,6 +33,8 @@ real(8),allocatable :: sbuffer(:), rbuffer(:)
 !<ne> # of elements for one atom.
 !     Example) In case atom type, position and velocity to be sent,  ne = 1+3+3 = 7
 integer :: ns, nr, na, ne
+integer :: ns_atoms(6) = (/0,0,0,0,0,0/)
+integer :: nr_atoms(6) = (/0,0,0,0,0,0/)
 
 !<NE_COPY>,<NE_MOVE>,<NE_CPBK> :: Number of Elements to COPY, MOVE atoms and CoPy BacK force. 
 integer,parameter :: MODE_COPY = 1, MODE_MOVE = 2, MODE_CPBK = 3
