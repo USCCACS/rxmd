@@ -74,7 +74,6 @@ do i=1, copyptr(cptridx(dflag))
    if (inBuffer_qeq(dflag,dr,pos(i,is_xyz(dflag)))) then
       commflag(0) = commflag(0) + 1
       commflag(commflag(0)) = i
-      !write(*,*) commflag(0),i,commflag(commflag(0))
    end if
 enddo
 return
