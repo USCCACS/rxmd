@@ -10,7 +10,7 @@ real(8),intent(IN) :: dr(3)
 real(8),target :: atype(NBUFFER), q(NBUFFER)
 real(8),target :: pos(NBUFFER,3),v(NBUFFER,3),f(NBUFFER,3)
 
-logical :: commflag(NBUFFER)
+integer :: commflag(0:NBUFFER)
 
 integer :: ixyz,tn1,tn2, dflag
 integer :: ni, ity
@@ -65,12 +65,17 @@ integer, intent(in) :: dflag
 ! the thickness of the skin from the surface
 real(8), intent(in) :: dr(3)
 ! commflag tag array
-logical, intent(inout) :: commflag(NBUFFER)
+integer, intent(inout) :: commflag(0:NBUFFER)
 integer :: i
+commflag(0)=0
 do i=1, copyptr(cptridx(dflag))
    ! check if an atom is within the skin
    ! Ye: FIXME commflag should not be just flags, it should be the index of the filterred atoms
-   commflag(i) = inBuffer_qeq(dflag,dr,pos(i,is_xyz(dflag)))
+   if (inBuffer_qeq(dflag,dr,pos(i,is_xyz(dflag)))) then
+      commflag(0) = commflag(0) + 1
+      commflag(commflag(0)) = i
+      !write(*,*) commflag(0),i,commflag(commflag(0))
+   end if
 enddo
 return
 end subroutine
@@ -84,30 +89,29 @@ implicit none
 integer,intent(IN) :: tn
 integer,intent(IN) :: dflag
 integer,intent(IN) :: imode
-integer :: n,ni,is,a,b,ioffset
+integer :: n,ni,is,a,b,ioffset,atom_id
 real(8) :: sft
 
 !--- reset the number of atoms to be sent
 ns=0
 !--- # of elements to be sent. should be more than enough. 
 ! Ye: FIXME it seems computing the reserved space. probably more than required.
-ni = copyptr(cptridx(dflag))*ne
+ni = commflag(0)*ne
 !--- <sbuffer> will deallocated in store_atoms
 call CheckSizeThenReallocate_qeq(sbuffer,ni)
 
-do n=1,copyptr(cptridx(dflag))
-   if(commflag(n)) then
-       if (imode==MODE_QCOPY1) then
-           sbuffer(ns+1) = qs(n)
-           sbuffer(ns+2) = qt(n)
-       end if
-       if(imode==MODE_QCOPY2) then
-           sbuffer(ns+1) =  hs(n)
-           sbuffer(ns+2) =  ht(n)
-           sbuffer(ns+3) = q(n)
-        end if
-        ns = ns + ne
-     end if
+do atom_id=1,commflag(0)
+   n = commflag(atom_id)
+   if (imode==MODE_QCOPY1) then
+       sbuffer(atom_id) = qs(n)
+       sbuffer(commflag(0)+atom_id) = qt(n)
+   end if
+   if(imode==MODE_QCOPY2) then
+      sbuffer(atom_id) =  hs(n)
+      sbuffer(commflag(0)+atom_id) =  ht(n)
+      sbuffer(2*commflag(0)+atom_id) = q(n)
+   end if
+      ns = ns + ne
 end do
 
 end subroutine store_atoms_qeq
@@ -118,7 +122,7 @@ use atoms;
 !--------------------------------------------------------------------------------------------------------------
 implicit none
 integer,intent(IN) :: dflag, imode
-integer :: m, i, ine
+integer :: m, i, ine,st,en
 
 if( (na+nr)/ne > NBUFFER) then
     print'(a,i4,5i8)', "ERROR: over capacity in append_atoms; myid,na,nr,ne,(na+nr)/ne,NBUFFER: ", &
@@ -129,23 +133,19 @@ endif
 
 copyptr(dflag) = copyptr(dflag-1) + nr/ne
 
+st=copyptr(dflag-1) + 1 
+en=copyptr(dflag-1) + 1 + nr/ne
+m=nr/ne
+
 if (imode==MODE_QCOPY1) then
-    do i=0, nr/ne-1
-       ine=i*ne
-       m = copyptr(dflag-1) + 1 + i
-       qs(m) = rbuffer(ine+1)
-       qt(m) = rbuffer(ine+2)
-    end do
+    qs(st:en) = rbuffer(1:m)
+    qt(st:en) = rbuffer(m+1:2*m)
 end if
 
 if (imode==MODE_QCOPY2) then
-   do i=0, nr/ne-1
-      ine=i*ne
-      m = copyptr(dflag-1) + 1 + i
-      hs(m) = rbuffer(ine+1)
-      ht(m) = rbuffer(ine+2)
-      q(m)  = rbuffer(ine+3)
-   end do
+   hs(st:en) = rbuffer(1:m)
+   ht(st:en) = rbuffer(m+1:2*m)
+   q(st:en)  = rbuffer(2*m+1:3*m)
 end if
 
 !--- update the total # of transfered elements.
