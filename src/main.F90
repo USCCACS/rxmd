@@ -424,49 +424,56 @@ implicit none
 
 real(8),intent(in) :: pos(NBUFFER,3)
 
-integer :: c1,c2,c3,c4,c5,c6,i,j,m,n,mn,iid,jid
+integer :: c1,c2,c3,c4,c5,c6,i,j,m,n,mn
 integer :: l2g
 real(8) :: dr(3), dr2
 
 integer :: ti,tj,tk
+
+integer :: m_size=0                ! keep track of the size of the packed_indices and packed_coordinates
+integer, parameter :: max_pack = 256  ! maximum packing size for packing neighborlist
+integer :: packed_indices(1:max_pack)   ! contains the indicies of the neighbor for each atom
+real(8) :: packed_coordinates(1:max_pack,3)  ! contains the atomic coordinates og the packed neighbor
+
 call system_clock(ti,tk)
 
 ! reset non-bonding pair list
-nbplist(0,:)=0
+!nbplist(0,:) = 0
 
-!$omp parallel do default(shared),private(c1,c2,c3,c4,c5,c6,i,j,m,n,mn,iid,jid,dr,dr2)
-do c1=0, nbcc(1)-1
-do c2=0, nbcc(2)-1
-do c3=0, nbcc(3)-1
+!$omp parallel do default(shared),private(c1,c2,c3,c4,c5,c6,i,j,m,n,mn,m_size,packed_indices,packed_coordinates)
+do c1 = 0, nbcc(1)-1
+do c2 = 0, nbcc(2)-1
+do c3 = 0, nbcc(3)-1
 
    i = nbheader(c1,c2,c3)
    do m = 1, nbnacell(c1,c2,c3)
-
+      
+      m_size = 0
+      nbplist(0,i) = 0
       do mn = 1, nbnmesh
          c4 = c1 + nbmesh(1,mn)
          c5 = c2 + nbmesh(2,mn)
          c6 = c3 + nbmesh(3,mn)
 
          j = nbheader(c4,c5,c6)
-         do n=1, nbnacell(c4,c5,c6)
-
-            !if(i<j .or. NATOMS<j) then
-            if(i/=j) then
-               dr(1:3) = pos(i,1:3) - pos(j,1:3)
-               dr2 = sum(dr(1:3)*dr(1:3))
-
-               if(dr2<=rctap2) then
-                 nbplist(0,i)=nbplist(0,i)+1
-                 nbplist(nbplist(0,i),i)=j
-               endif
-
-            endif
-
-            j=nbllist(j)
+         do n = 1, nbnacell(c4,c5,c6)
+            if (i /= j) then
+               m_size = m_size + 1
+               packed_indices(m_size) = j
+               packed_coordinates(m_size,:) = pos(j, 1:3)
+            end if
+            if (m_size == max_pack) then
+               call calc_packed_neighbor(m_size, max_pack, pos(i,1:3), packed_coordinates, packed_indices, nbplist(:,i))
+               m_size = 0
+            end if
+            j = nbllist(j)
          enddo
        enddo
-
-      i=nbllist(i)
+       if (m_size > 0) then
+          call calc_packed_neighbor(m_size, max_pack, pos(i,1:3), packed_coordinates, packed_indices, nbplist(:,i))
+          m_size = 0
+       end if
+      i = nbllist(i)
    enddo
 enddo; enddo; enddo
 !$omp end parallel do
@@ -475,6 +482,39 @@ call system_clock(tj,tk)
 it_timer(15)=it_timer(15)+(tj-ti)
 
 end subroutine
+
+!----------------------------------------------------------------------
+subroutine  calc_packed_neighbor(m_size, max_pack, posi, packed_coordinates, packed_indices, nbplist_i)
+use atoms; use parameters
+!----------------------------------------------------------------------
+
+implicit None
+real(8), intent(in) :: posi(3)
+integer, intent(in) :: m_size, max_pack
+real(8), intent(in) :: packed_coordinates(1:max_pack,3)  ! contains the atomic coordinates of the packed neighbor
+integer, intent(in) :: packed_indices(1:max_pack)
+integer, intent(inout) :: nbplist_i(0:MAXNEIGHBS10)
+real(8) :: dr2(1:max_pack), dr(3)  ! contanins distance square for the entire batch of packed atoms to the reference atom
+integer :: i_pack, i_counter
+
+! compute distance square
+do i_pack = 1, m_size
+   dr(1:3) = posi(1:3) - packed_coordinates(i_pack,1:3)
+   dr2(i_pack) = sum(dr(1:3)*dr(1:3))
+end do
+
+! construct neighbour list
+i_counter = nbplist_i(0)
+do i_pack = 1, m_size
+   if (dr2(i_pack) <= rctap2) then
+       i_counter = i_counter + 1
+       nbplist_i(i_counter) = packed_indices(i_pack)
+   end if
+end do
+nbplist_i(0) = i_counter
+
+end subroutine
+
 
 !----------------------------------------------------------------------
 subroutine angular_momentum(atype, pos, v)
