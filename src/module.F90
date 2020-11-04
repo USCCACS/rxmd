@@ -145,6 +145,9 @@ real(8) :: wt0=0.d0
 integer :: rng_seed=42
 logical :: reset_velocity_random=.false.
 
+!--- start from ice-Ih config
+logical :: start_from_h2o = .false.
+
 interface forcefield_param_interface
   subroutine forcefield_param(path)
     character(len=:),allocatable,intent(in) :: path

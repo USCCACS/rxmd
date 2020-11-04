@@ -6,7 +6,7 @@ use utils, only : getstr, UTIME, UTEMP0, MAXSTRLENGTH, find_cmdline_argc, put_rn
 use base, only : myid, vprocs, ierr, dt, fstep, pstep, ftol, isbinary, isbondfile, ispdb, isxyz, isrunfromxyz, &
                  mdmode, ntime_step, ParmPath, ParmPath0, DataDir, DataDir0, FFPath, FFPath0, RunFromXYZPath, &
                  isSpring, springConst, forcefield_type, sstep, treq, vsfact, rng_seed, reset_velocity_random, &
-                 vmag_factor, xyz_num_stack, &
+                 vmag_factor, xyz_num_stack, start_from_h2o, &
                  forcefield_type, is_fnn, is_reaxff
 
 use atoms, only : lex_fqs, lex_k, lex_w2,  NMAXQEq, qeq_tol, qstep, isqeq, & 
@@ -185,6 +185,11 @@ endif
 if(find_cmdline_argc('--random_velocity',idx).or.find_cmdline_argc('-randomv',idx)) then
    reset_velocity_random = .true.
    if(myrank==0) print*,'INFO: initialize random velocity before MD loop.', reset_velocity_random
+endif
+
+if(find_cmdline_argc('--start_from_h2o',idx).or.find_cmdline_argc('-h2o',idx)) then
+   start_from_h2o = .true.
+   if(myrank==0) print*,'INFO: starting from H2O unitcell.', start_from_h2o
 endif
 
 
