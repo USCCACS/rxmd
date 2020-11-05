@@ -1,12 +1,13 @@
-4                    ! potential_type
-1.0  0.006    1.24   ! alpha_bond, alpha_angle, rc_oh
-353.720 84.367       ! Kr, Kq   (kcal/mol/A^2), (kcal/mol/degree^2)
-1.0    105.00        ! r0, q0
-0.0  0.94  1.08      ! beta_1 beta_s1, beta_l1
-0.0  0.90  1.12      ! beta_2 beta_s2, beta_l2
-70   50   0.7        ! fcut_o fcut_h ffactor      # force filtering parameters
-1.35  0.92  2.20     ! dHH_min, dOH_min, dOO_min  # bond statistics parameters
-1.80  1.08  1d99     ! dHH_max, dOH_max, dOO_max  # bond statistics parameters
-0.92 1.07 1.44 2.5   ! rc_inner, rc_outer, rc_hh_min, rc_oo_min  # distance-based force reset
-0.5  1.5             ! stop_OH_min, stop_OH_max    # stop conditions based on O-H bond length
-35.37 2.6            ! Kr_O, r0_O   # (kcal/mol/A^2) spring potential for O-O 
+4                    !01 potential_type             # 4-global Id based, 5-neighbor-list based.
+1.0     0.006  1.24  !02 alpha_bond, alpha_angle, rc_oh
+353.720 84.367       !03 Kr(O-H spring), Kq(H-O-H spring)  # (kcal/mol/A^2), (kcal/mol/degree^2)
+1.0    105.00        !04 r0(desired O-H bond length), q0 (desired H-O-H angle)
+35.37     2.6        !05 Kr_O, r0_O   # (kcal/mol/A^2), (A) one-sided spring parameters for O-O 
+0.0   0.94   1.08    !06 beta_1 beta_s1, beta_l1    # O-H bond range1
+0.0   0.90   1.12    !07 beta_2 beta_s2, beta_l2    # O-H bond range2
+70    50    0.7      !08 fcut_o, fcut_h,  ffactor   # force filtering parameters
+1.35   0.92   2.20   !09 dHH_min, dOH_min, dOO_min  # bond statistics parameters
+1.80   1.08   1d99   !10 dHH_max, dOH_max, dOO_max  # bond statistics parameters
+0.92    1.07         !11 rc_inner, rc_outer         # distance-based (O-H) ML force termination
+1.44     2.5         !12 rc_hh_min, rc_oo_min       # distance-based (H-H,O-O) ML force termination
+0.5      1.5         !13 stop_OH_min, stop_OH_max   # given code stop conditions based on O-H bond length

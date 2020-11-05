@@ -1,7 +1,7 @@
 # RXMD params 
 mdmode       7                      <mdmode>
-time         0.2    50000           <dt> <ntime_step> 
-temperature  333  0.1   4           <treq> <vsfact> <sstep>
+time         0.2    10000           <dt> <ntime_step> 
+temperature  333  0.1   4  2.0          <treq> <vsfact> <sstep> <vmag_factor>
 io_step      100   1                <fstep>  <pstep>
 io_type      .true. .false. .false. .true. <isBinary> <isBondFile> <isPDB> <isXYZ>
 processors   1 1 1                  <vprocs>
