@@ -263,11 +263,11 @@ subroutine force_cutoff(fcut_o, fcut_h, ffactor)
 
       do ia=1,3
          if(f(i,ia) > fcut) then
-           print'(a,5i9,es15.5,2f8.2)','max force cutoff applied.', myid, ity, i, l2g(atype(i)), ia, f(i,ia), fcut, fset
+           !print'(a,5i9,es15.5,2f8.2)','max force cutoff applied.', myid, ity, i, l2g(atype(i)), ia, f(i,ia), fcut, fset
            f(i,ia) = fset
          endif
          if(f(i,ia) < -fcut) then
-           print'(a,5i9,es15.5,2f8.2)','min force cutoff applied.', myid, ity, i, l2g(atype(i)), ia, f(i,ia), fcut, fset
+           !print'(a,5i9,es15.5,2f8.2)','min force cutoff applied.', myid, ity, i, l2g(atype(i)), ia, f(i,ia), fcut, fset
            f(i,ia) = -fset
          endif
       enddo

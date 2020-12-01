@@ -914,12 +914,12 @@ do i=1, NATOMS                           ! O
 
    !Krcoef = bond_coeff * this%Kr*(rij(0)-this%r0) ! ij
    Krcoef = bond_coeff * get_smooth_spring_coeff(rij(0),this%Kr,this%r0) ! ij
-   if(potential_type==4) then
-     if(rij(0)<this%beta_s1.or.this%beta_l1<rij(0)) &
-       print'(a,f8.3,f8.3,2es15.5)', 'beta1: myid,i,j,ity,jty: '//info_ij,bond_coeff,rij(0),Krcoef,rhh(0)
-     if(rij(0)<this%beta_s2.or.this%beta_l2<rij(0)) &
-       print'(a,f8.3,f8.3,2es15.5)', 'beta2: myid,i,j,ity,jty: '//info_ij,bond_coeff,rij(0),Krcoef,rhh(0)
-   endif
+   !if(potential_type==4) then
+   !  if(rij(0)<this%beta_s1.or.this%beta_l1<rij(0)) &
+   !    print'(a,f8.3,f8.3,2es15.5)', 'beta1: myid,i,j,ity,jty: '//info_ij,bond_coeff,rij(0),Krcoef,rhh(0)
+   !  if(rij(0)<this%beta_s2.or.this%beta_l2<rij(0)) &
+   !    print'(a,f8.3,f8.3,2es15.5)', 'beta2: myid,i,j,ity,jty: '//info_ij,bond_coeff,rij(0),Krcoef,rhh(0)
+   !endif
 
    ff(1:3) = Krcoef*rij(1:3)
    f(i,1:3) = f(i,1:3) - ff(1:3)
@@ -934,21 +934,21 @@ do i=1, NATOMS                           ! O
 
    !Krcoef = bond_coeff * this%Kr*(rik(0)-this%r0) ! ik
    Krcoef = bond_coeff * get_smooth_spring_coeff(rik(0),this%Kr,this%r0) ! ik
-   if(potential_type==4) then
-     if(rik(0)<this%beta_s1.or.this%beta_l1<rik(0)) &
-        print'(a,f8.3,f8.3,2es15.5)','beta1: myid,i,k,ity,kty: '//info_ij,bond_coeff,rik(0),Krcoef,rhh(0)
-     if(rik(0)<this%beta_s2.or.this%beta_l2<rik(0)) &
-        print'(a,f8.3,f8.3,2es15.5)','beta2: myid,i,k,ity,kty: '//info_ik,bond_coeff,rik(0),Krcoef,rhh(0)
-   endif
+   !if(potential_type==4) then
+   !  if(rik(0)<this%beta_s1.or.this%beta_l1<rik(0)) &
+   !     print'(a,f8.3,f8.3,2es15.5)','beta1: myid,i,k,ity,kty: '//info_ij,bond_coeff,rik(0),Krcoef,rhh(0)
+   !  if(rik(0)<this%beta_s2.or.this%beta_l2<rik(0)) &
+   !     print'(a,f8.3,f8.3,2es15.5)','beta2: myid,i,k,ity,kty: '//info_ik,bond_coeff,rik(0),Krcoef,rhh(0)
+   !endif
 
    !if(rij(0)<0.85d0) print'(a,3i9,3f8.3)','OUTLIER: j-atom is too close ',igid,jgid,kgid,rij(0),rik(0),rhh(0)
    !if(rij(0)>1.15d0) print'(a,3i9,3f8.3)','OUTLIER: j-atom is too far',igid,jgid,kgid,rij(0),rik(0),rhh(0)
    !if(rik(0)<0.85d0) print'(a,3i9,3f8.3)','OUTLIER: k-atom is too close ',igid,jgid,kgid,rij(0),rik(0),rhh(0)
    !if(rik(0)>1.15d0) print'(a,3i9,3f8.3)','OUTLIER: k-atom is too far ',igid,jgid,kgid,rij(0),rik(0),rhh(0)
-   if(rij(0)<bstat%dOH_min) print'(a,3i9,3f8.3)','OUTLIER: j-atom is too close ',igid,jgid,kgid,rij(0),rik(0),rhh(0)
-   if(rij(0)>bstat%dOH_max) print'(a,3i9,3f8.3)','OUTLIER: j-atom is too far',igid,jgid,kgid,rij(0),rik(0),rhh(0)
-   if(rik(0)<bstat%dOH_min) print'(a,3i9,3f8.3)','OUTLIER: k-atom is too close ',igid,jgid,kgid,rij(0),rik(0),rhh(0)
-   if(rik(0)>bstat%dOH_max) print'(a,3i9,3f8.3)','OUTLIER: k-atom is too far ',igid,jgid,kgid,rij(0),rik(0),rhh(0)
+   !if(rij(0)<bstat%dOH_min) print'(a,3i9,3f8.3)','OUTLIER: j-atom is too close ',igid,jgid,kgid,rij(0),rik(0),rhh(0)
+   !if(rij(0)>bstat%dOH_max) print'(a,3i9,3f8.3)','OUTLIER: j-atom is too far',igid,jgid,kgid,rij(0),rik(0),rhh(0)
+   !if(rik(0)<bstat%dOH_min) print'(a,3i9,3f8.3)','OUTLIER: k-atom is too close ',igid,jgid,kgid,rij(0),rik(0),rhh(0)
+   !if(rik(0)>bstat%dOH_max) print'(a,3i9,3f8.3)','OUTLIER: k-atom is too far ',igid,jgid,kgid,rij(0),rik(0),rhh(0)
 
    if(rij(0)>bstat%dOH_max) bstat%num_oh_max = bstat%num_oh_max + 1
    if(rik(0)>bstat%dOH_max) bstat%num_oh_max = bstat%num_oh_max + 1
@@ -1045,7 +1045,7 @@ do i=1, NATOMS                           ! O
 
    ! setting ML force zero beyond ranges rc_inner and rc_outer for O-H1
    if(rij(0)<rc_inner.or.rc_outer<rij(0)) then
-     print'(a,f6.3,7e11.3)','fzero: myid,i,j,ity,jty,rij,fi,fj: '//info_ij,rij(0),f(i,1:3),f(j,1:3)
+     !print'(a,f6.3,7e11.3)','fzero: myid,i,j,ity,jty,rij,fi,fj: '//info_ij,rij(0),f(i,1:3),f(j,1:3)
      !f(i,1:3)=0.d0
      f(j,1:3)=0.d0
    endif
@@ -1055,7 +1055,7 @@ do i=1, NATOMS                           ! O
 
    ! setting ML force zero beyond ranges rc_inner and rc_outer for O-H2
    if(rik(0)<rc_inner.or.rc_outer<rik(0)) then
-     print'(a,f6.3,7e11.3)','fzero: myid,i,k,ity,kty,rik,fi,fk: '//info_ik,rik(0),f(i,1:3),f(k,1:3)
+     !print'(a,f6.3,7e11.3)','fzero: myid,i,k,ity,kty,rik,fi,fk: '//info_ik,rik(0),f(i,1:3),f(k,1:3)
      !f(i,1:3)=0.d0
      f(k,1:3)=0.d0
    endif
