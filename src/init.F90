@@ -9,7 +9,7 @@ module init
   use pqeq_mod, only : PQEq, initialize_eField, initialize_pqeq
   use force_mod, only : force_reaxff
   use memory_allocator_mod
-  use fileio, only : ReadBIN, ReadXYZ, ReadH2O, xyz_agg
+  use fileio, only : ReadBIN, ReadXYZ, ReadH2O, ReadPTO, xyz_agg
 
   use fnn, only : fnn_param, fnn_param_obj, get_cutoff_fnn, &
                   num_pairs, num_types, mddriver_fnn, get_max_cutoff
@@ -100,7 +100,8 @@ endif
 if(isRunFromXYZ) then
   call ReadXYZ(atype, pos, v, q, f, RunFromXYZPath)
 else
-  call ReadBIN(atype, pos, v, q, f, trim(DataDir)//"/rxff.bin")
+  !call ReadBIN(atype, pos, v, q, f, trim(DataDir)//"/rxff.bin")
+  call ReadPTO(atype, pos, v, q, f, trim(DataDir)//"/rxff.bin")
 endif
 
 !--- get global number of atoms by summing up each type. 

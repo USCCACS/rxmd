@@ -163,7 +163,7 @@ else
   if(isBondFile) call WriteBND(fileNameBase)
   if(isPDB) call WritePDB(fileNameBase)
   if(isXYZ) then
-     if( find_cmdline_argc('--xyz_pto',idx)) then
+     if( find_cmdline_argc('--xyz_pto',idx) .or. find_cmdline_argc('--xyz_pto_tionly',idx) ) then
        call WriteXYZ_PTO(fileNameBase, atype, pos, v, q, f)
      else
        call WriteXYZ(fileNameBase, atype, pos, v, q, f)
@@ -813,6 +813,107 @@ it_timer(22)=it_timer(22)+(tj-ti)
 
 return
 end
+
+
+!--------------------------------------------------------------------------
+subroutine ReadPTO(atype, rreal, v, q, f, fileName)
+!--------------------------------------------------------------------------
+implicit none
+
+character(*),intent(in) :: fileName
+real(8),allocatable,dimension(:),intent(inout) :: atype,q
+real(8),allocatable,dimension(:,:),intent(inout) :: rreal,v,f
+
+integer :: i,i1
+
+integer (kind=MPI_OFFSET_KIND) :: offset, offsettmp
+integer (kind=MPI_OFFSET_KIND) :: fileSize
+integer :: localDataSize, metaDataSize, scanbuf
+integer :: fh ! file handler
+
+integer :: nmeta
+integer,allocatable :: idata(:)
+real(8),allocatable :: dbuf(:)
+real(8) :: ddata(6), d10(10)
+
+real(8) :: rnorm(NBUFFER,3), mat(3,3)
+integer :: j
+
+!=== # of unit cells ===
+!integer :: mx=2,my=2,mz=2
+integer :: mx=10,my=10,mz=3
+
+integer :: ix,iy,iz,ntot, imos2, iigd
+
+integer :: ti,tj,tk
+
+integer,parameter :: nMoS2=5
+real(8) :: pos0(nMoS2*3)
+integer :: atype0(nMoS2)
+
+call system_clock(ti,tk)
+
+!--- allocate arrays
+if(.not.allocated(atype)) call allocator(atype,1,NBUFFER)
+if(.not.allocated(q)) call allocator(q,1,NBUFFER)
+if(.not.allocated(rreal)) call allocator(rreal,1,NBUFFER,1,3)
+if(.not.allocated(v)) call allocator(v,1,NBUFFER,1,3)
+if(.not.allocated(f)) call allocator(f,1,NBUFFER,1,3)
+if(.not.allocated(qsfp)) call allocator(qsfp,1,NBUFFER)
+if(.not.allocated(qsfv)) call allocator(qsfv,1,NBUFFER)
+f(:,:)=0.0d0
+
+pos0=(/ &
+1.000000000d0,   1.000000000d0,   1.000000000d0, &
+0.500000000d0,   0.500000000d0,   0.537699952d0, &
+0.500000000d0,   0.500000000d0,   0.111800048d0, &
+1.000000000d0,   0.500000000d0,   0.617399904d0, &
+0.500000000d0,   1.000000000d0,   0.617399904d0 /)
+
+atype0=(/1, 2, 3, 3, 3/)
+
+!--- local unit cell parameters
+lata=3.90200d0
+latb=3.90200d0
+latc=4.15600d0
+lalpha=90.0000d0
+lbeta=90.0000d0
+lgamma=90.0000d0
+
+iigd = mx*my*mz*nMoS2*myid ! for global ID
+ntot=0
+do ix=0,mx-1
+do iy=0,my-1
+do iz=0,mz-1
+   do imos2=1,nMoS2
+      ntot=ntot+1
+      rreal(ntot,1:3) = pos0(3*imos2-2:3*imos2)+(/ix,iy,iz/)  ! repeat unit cell
+      rreal(ntot,1:3) = rreal(ntot,1:3)+vID(1:3)*(/mx,my,mz/) ! adding the box origin
+      rreal(ntot,1:3) = rreal(ntot,1:3)*(/lata,latb,latc/) ! real coords
+      atype(ntot) = dble(atype0(imos2)) + (iigd+ntot)*1d-13
+   enddo
+enddo; enddo; enddo
+NATOMS=ntot
+
+!--- update to glocal cell parameters
+lata=lata*mx*vprocs(1)
+latb=latb*my*vprocs(2)
+latc=latc*mz*vprocs(3)
+
+call get_boxparameters(mat,lata,latb,latc,lalpha,lbeta,lgamma)
+do i=1, 3
+do j=1, 3
+   HH(i,j,0)=mat(i,j)
+enddo; enddo
+call update_box_params(vprocs, vid, hh, lata, latb, latc, maxrc, &
+                       cc, lcsize, hhi, mdbox, lbox, obox)
+
+call system_clock(tj,tk)
+it_timer(22)=it_timer(22)+(tj-ti)
+
+return
+end
+
 
 !--------------------------------------------------------------------------
 subroutine ReadH2O(atype, rreal, v, q, f, fileName)
