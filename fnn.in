@@ -1,4 +1,5 @@
-### H2O system ###
+### PTO system ###
 ## model data: element name, AMU, aenet model, cutoff distance
-model  H     6.00  H.20t-20t.nn 7.0
-model  O    15.99  O.20t-20t.nn 7.0
+model  Pb   207.2   Pb.20t-20t.nn  5.5
+model  Ti   47.87   Ti.20t-20t.nn  5.5
+model  O    16.00   O.20t-20t.nn   5.5

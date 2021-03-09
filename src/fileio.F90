@@ -842,7 +842,7 @@ integer :: j
 !=== # of unit cells ===
 !integer :: mx=2,my=2,mz=2
 !integer :: mx=3,my=3,mz=3
-integer :: mx=16,my=16,mz=3
+integer :: mx=16,my=12,mz=4
 
 integer :: ix,iy,iz,ntot, imos2, iigd
 
