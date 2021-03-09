@@ -3924,7 +3924,7 @@ contains
 
     ! knomura
     if(N_nb_max > 2000) then
-       print*,'INFO : N_nb_max is too large. setting it to 2000.', nnb_max
+       !print*,'INFO : N_nb_max is too large. setting it to 2000.', nnb_max
        nnb_max = 2000
     endif
 

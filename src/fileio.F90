@@ -841,7 +841,8 @@ integer :: j
 
 !=== # of unit cells ===
 !integer :: mx=2,my=2,mz=2
-integer :: mx=10,my=10,mz=3
+!integer :: mx=3,my=3,mz=3
+integer :: mx=16,my=16,mz=3
 
 integer :: ix,iy,iz,ntot, imos2, iigd
 
@@ -850,6 +851,16 @@ integer :: ti,tj,tk
 integer,parameter :: nMoS2=5
 real(8) :: pos0(nMoS2*3)
 integer :: atype0(nMoS2)
+
+real(8) :: drnd(3)
+integer :: num_seed
+integer,allocatable :: seeds(:)
+
+!--- initialize random seed with MPI rank
+call random_seed(size=num_seed)
+allocate(seeds(num_seed))
+seeds=myid
+call random_seed(put=seeds)  
 
 call system_clock(ti,tk)
 
@@ -872,6 +883,7 @@ pos0=(/ &
 
 atype0=(/1, 2, 3, 3, 3/)
 
+
 !--- local unit cell parameters
 lata=3.90200d0
 latb=3.90200d0
@@ -890,6 +902,10 @@ do iz=0,mz-1
       rreal(ntot,1:3) = pos0(3*imos2-2:3*imos2)+(/ix,iy,iz/)  ! repeat unit cell
       rreal(ntot,1:3) = rreal(ntot,1:3)+vID(1:3)*(/mx,my,mz/) ! adding the box origin
       rreal(ntot,1:3) = rreal(ntot,1:3)*(/lata,latb,latc/) ! real coords
+      call random_number(drnd)
+      drnd(1:3) = drnd(1:3)*0.2d0
+      !if(myid==0) print'(a,3f)','drnd(1:3): ', drnd(1:3)
+      rreal(ntot,1:3) = rreal(ntot,1:3) + drnd(1:3)
       atype(ntot) = dble(atype0(imos2)) + (iigd+ntot)*1d-13
    enddo
 enddo; enddo; enddo

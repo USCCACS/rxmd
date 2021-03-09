@@ -41,7 +41,7 @@ real(8),intent(in out),allocatable,dimension(:) :: atype, q
 real(8),intent(in out),allocatable,dimension(:,:) :: pos, v, f
 
 real(8) :: dns
-integer :: i,j,k, ity, l(3)
+integer :: i,j,k, ity, l(3), idx
 
 !--- an error trap
 if(vprocs(1)*vprocs(2)*vprocs(3) /= nprocs ) then
@@ -100,8 +100,13 @@ endif
 if(isRunFromXYZ) then
   call ReadXYZ(atype, pos, v, q, f, RunFromXYZPath)
 else
-  !call ReadBIN(atype, pos, v, q, f, trim(DataDir)//"/rxff.bin")
-  call ReadPTO(atype, pos, v, q, f, trim(DataDir)//"/rxff.bin")
+  if(find_cmdline_argc('--start_from_pto',idx)) then
+    call ReadPTO(atype, pos, v, q, f, trim(DataDir)//"/rxff.bin")
+  else if(find_cmdline_argc('--start_from_h2o',idx)) then
+    call ReadH2O(atype, pos, v, q, f, trim(DataDir)//"/rxff.bin")
+  else
+    call ReadBIN(atype, pos, v, q, f, trim(DataDir)//"/rxff.bin")
+  endif
 endif
 
 !--- get global number of atoms by summing up each type. 
