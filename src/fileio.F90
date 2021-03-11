@@ -402,14 +402,14 @@ integer :: i, ity, idx1, idx0, igd
 
 integer (kind=MPI_OFFSET_KIND) :: offset
 integer (kind=MPI_OFFSET_KIND) :: fileSize
-integer :: localDataSize
+integer(8) :: localDataSize
 integer :: fh ! file handler
 
 integer :: OneLineSize, MetaDataSize
 character(60) :: a60
 character(len=:),allocatable :: OneLine,AllLines
 
-integer :: scanbuf
+integer(8) :: scanbuf
 
 integer :: ti,tj,tk
 
@@ -482,7 +482,7 @@ MetaDataSize = 9 + 60 + 2
 write(a60,'(3f12.5,3f8.3)')  lata,latb,latc,lalpha,lbeta,lgamma
 
 ! name + pos(i,1:3) + gid + dpol(i,1:3) + octa_order + newline
-OneLineSize = 3 + 36 + 9 + 36 + 2 + 1 
+OneLineSize = 3 + 36 + 12 + 36 + 2 + 1 
 
 ! get local datasize
 if(find_cmdline_argc('--xyz_pto_tionly',idx)) then
@@ -496,13 +496,13 @@ call MPI_File_Open(MPI_COMM_WORLD,trim(fileNameBase)//".xyz", &
      MPI_MODE_WRONLY+MPI_MODE_CREATE,MPI_INFO_NULL,fh,ierr)
 
 ! offset will point the end of local write after the scan
-call MPI_Scan(localDataSize,scanbuf,1,MPI_INTEGER,MPI_SUM,MPI_COMM_WORLD,ierr)
+call MPI_Scan(localDataSize,scanbuf,1,MPI_INTEGER8,MPI_SUM,MPI_COMM_WORLD,ierr)
 
 ! since offset is MPI_OFFSET_KIND and localDataSize is integer, use an integer as buffer
 offset=scanbuf
 
 ! nprocs-1 rank has the total data size
-call MPI_Bcast(scanbuf,1,MPI_INTEGER,nprocs-1,MPI_COMM_WORLD,ierr)
+call MPI_Bcast(scanbuf,1,MPI_INTEGER8,nprocs-1,MPI_COMM_WORLD,ierr)
 fileSize=scanbuf
 
 call MPI_File_set_size(fh, fileSize, ierr)
@@ -547,7 +547,7 @@ do i=1, NATOMS
   write(OneLine(idx1:idx1+35),'(3f12.5)') pos(i,1:3); idx1=idx1+36
 
 ! global Id
-  write(OneLine(idx1:idx1+8),'(i9)') igd; idx1=idx1+9
+  write(OneLine(idx1:idx1+11),'(i12)') igd; idx1=idx1+12
 
   write(OneLine(idx1:idx1+35),'(3es12.4)') dpol(i,1:3); idx1=idx1+36
 
