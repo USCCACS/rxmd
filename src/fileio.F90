@@ -551,7 +551,8 @@ do i=1, NATOMS
 
   write(OneLine(idx1:idx1+35),'(3es12.4)') dpol(i,1:3); idx1=idx1+36
 
-  octa_parity(1:2) = nint(pos(i,1:2)/aaxis)
+  octa_parity(1:2) = nint(pos(i,1:2)/aaxis+0.5d0)
+
   if( rotation_flag(i) == 0 ) then
     write(OneLine(idx1:idx1+1),'(i2)') 0; idx1=idx1+2
   else
@@ -841,8 +842,8 @@ integer :: j
 
 !=== # of unit cells ===
 !integer :: mx=2,my=2,mz=2
-!integer :: mx=3,my=3,mz=3
-integer :: mx=16,my=12,mz=4
+!integer :: mx=32,my=24,mz=3
+integer :: mx=8,my=6,mz=3
 
 integer :: ix,iy,iz,ntot, imos2, iigd
 
@@ -903,8 +904,7 @@ do iz=0,mz-1
       rreal(ntot,1:3) = rreal(ntot,1:3)+vID(1:3)*(/mx,my,mz/) ! adding the box origin
       rreal(ntot,1:3) = rreal(ntot,1:3)*(/lata,latb,latc/) ! real coords
       call random_number(drnd)
-      drnd(1:3) = drnd(1:3)*0.2d0
-      !if(myid==0) print'(a,3f)','drnd(1:3): ', drnd(1:3)
+      drnd(1:3) = (2.d0*drnd(1:3)-1.d0)*0.001d0
       rreal(ntot,1:3) = rreal(ntot,1:3) + drnd(1:3)
       atype(ntot) = dble(atype0(imos2)) + (iigd+ntot)*1d-13
    enddo

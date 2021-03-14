@@ -1,7 +1,7 @@
 #!/bin/sh
 
-exec='srun -n 256 --mpi=pmi2 ./rxmd --vprocs 16 16 1 --xyz_pto_tionly'
+exec='srun -n 1024 --mpi=pmi2 ./rxmd --vprocs 32 32 1 --xyz_pto_tionly'
 
 make -j rxmd 
-${exec} --start_from_pto --random_velocity --treq 150 --mdmode 1 --sstep 200 --ntime_step 1000 --dt 0.2
-${exec} --treq 10 --mdmode 7 --sstep 10 --ntime_step 10000 --dt 1.0
+${exec} --start_from_pto --random_velocity --treq 100 --mdmode 1 --ntime_step 5000 --dt 0.5 | tee log01
+${exec} --treq 150 --mdmode 5 --sstep 10 --ntime_step 20000 --dt 0.5 | tee log02
