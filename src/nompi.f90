@@ -350,4 +350,12 @@ contains
      call cpu_time(t) 
    end function
 
+   subroutine mpi_get_processor_name(hostname, resultlen, ierr)
+      character(*) :: hostname
+      integer :: resultlen, ierr
+      hostname = 'localhost'
+      resultlen = 8
+      ierr = 0
+   end subroutine
+
 end module

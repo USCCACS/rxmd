@@ -1,12 +1,11 @@
 module mod_short_repulsion
 
 use base
+use mpi_mod
 use fileio, only : output
 use utils, only : l2g, find_cmdline_argc, get_command_argument_str, Ekcal_j, assert, int_to_str
 
 implicit none
-
-include 'mpif.h'
 
 type bond_stats
 
