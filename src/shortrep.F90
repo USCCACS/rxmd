@@ -4,9 +4,12 @@ use base
 use fileio, only : output
 use utils, only : l2g, find_cmdline_argc, get_command_argument_str, Ekcal_j, assert, int_to_str
 
-implicit none
-
+#ifdef NOMPI
+use nompi
+#else
 include 'mpif.h'
+#endif
+
 
 type bond_stats
 

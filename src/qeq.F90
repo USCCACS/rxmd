@@ -292,7 +292,7 @@ Est = 0.d0
 hshs_sum = 0.d0
 hsht_sum = 0.d0
 
-!$omp parallel do default(shared), schedule(runtime), private(i,j,j1,ity,eta_ity,Est1,t_hshs,t_hsht),reduction(+:Est,hshs_sum,hsht_sum)
+!$omp parallel do default(shared), private(i,j,j1,ity,eta_ity,Est1,t_hshs,t_hsht),reduction(+:Est,hshs_sum,hsht_sum)
 do i=1, NATOMS
    ity = nint(atype(i))
    eta_ity = eta(ity)
