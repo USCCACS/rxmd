@@ -8,11 +8,14 @@
 
 MPIF90 = mpif90
 FC = nvfortran
+FC = gfortran
 
 #MPIF90_FLAGS = -fopenmp -g -mp -target=gpu -gpu=cc70,cuda10.1
 MPIF90_FLAGS = -O3
 
-FC_FLAGS = -O3 
+FC_FLAGS = -O3 -pg
+FC_FLAGS = -O3 -fno-lto -fopenmp -foffload=nvptx-none -fstack-protector
+
 
 # LINKER = 
 # LIBS =
